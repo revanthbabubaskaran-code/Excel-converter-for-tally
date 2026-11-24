@@ -2,7 +2,9 @@
 
 A local Windows desktop app that converts the supplied hospital `.xls` reports into a workbook with the sample output sheet names and columns. It opens as a desktop window and does not use a browser.
 
-The first run asks you to create a local profile with an email ID and a 4–8 character password. Later runs require those credentials. Passwords are stored as salted hashes; if **Remember me** is selected, a separate copy is encrypted with Windows DPAPI for autofill on the same Windows account. Login is checked locally and does not verify ownership of the email address online.
+The first run asks you to verify an email address with a randomly generated four-digit numeric code, then create a local profile with a 4–8 character password. The code expires after 10 minutes; a newly requested code replaces the previous one. Email IDs are matched without regard to capitalization. Later runs require those credentials. Passwords are stored as salted hashes; if **Remember me** is selected, a separate copy is encrypted with Windows DPAPI for autofill on the same Windows account.
+
+Email verification uses SMTP. Before first use, set these environment variables on the Windows account that runs the app: `EXCEL_TALLY_SMTP_HOST`, `EXCEL_TALLY_SMTP_PORT`, `EXCEL_TALLY_SMTP_USERNAME`, `EXCEL_TALLY_SMTP_PASSWORD`, and `EXCEL_TALLY_SMTP_FROM`. Port 465 uses SSL; other configured ports use STARTTLS. For Gmail, use an app password rather than your normal account password. If SMTP is not configured or email delivery fails, profile setup remains blocked and the app does not reveal the code.
 
 ## Run on Windows
 

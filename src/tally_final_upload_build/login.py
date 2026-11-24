@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import time
 import tkinter as tk
 from tkinter import messagebox, ttk
 
 from tally_final_upload_build.app import ExcelForTallyApp
+from tally_final_upload_build.email_verification import new_verification_code, send_verification_code
 from tally_final_upload_build.profile import (
     PASSWORD_MAX_LENGTH,
     PASSWORD_MIN_LENGTH,
     ProfileError,
     create_profile,
     load_profile,
+    normalize_email,
     password_matches,
     remembered_password,
     set_remembered_login,
@@ -38,6 +43,10 @@ class LoginFlow:
     @staticmethod
     def _password_length_ok(proposed: str) -> bool:
         return len(proposed) <= PASSWORD_MAX_LENGTH
+
+    @staticmethod
+    def _verification_code_ok(proposed: str) -> bool:
+        return len(proposed) <= 4 and (not proposed or proposed.isascii() and proposed.isdigit())
 
     @staticmethod
     def _profile_location() -> str:
@@ -83,10 +92,12 @@ class LoginFlow:
 
     def show_setup(self) -> None:
         outer = self._content()
+        self.root.geometry("560x760")
+        self.root.minsize(520, 700)
         ttk.Label(outer, text="Create your local profile", font=("Segoe UI", 13, "bold")).pack(anchor="w", pady=(20, 3))
         ttk.Label(
             outer,
-            text="This profile is saved on this Windows account. Login checks the credentials against this local profile; it does not verify email ownership online.",
+            text="Verify your email before creating a profile. Your profile and password hash are saved on this Windows account.",
             style="Sub.TLabel",
             wraplength=440,
             justify="left",
@@ -95,6 +106,72 @@ class LoginFlow:
         ttk.Label(outer, text="Login email ID").pack(anchor="w")
         email_entry = ttk.Entry(outer, font=("Segoe UI", 11))
         email_entry.pack(fill="x", pady=(4, 12))
+
+        code_frame = ttk.Frame(outer)
+        ttk.Label(code_frame, text="4-digit email verification code").pack(anchor="w")
+        code_vcmd = (self.root.register(self._verification_code_ok), "%P")
+        code_entry = ttk.Entry(code_frame, font=("Segoe UI", 11), validate="key", validatecommand=code_vcmd)
+        code_entry.pack(fill="x", pady=(4, 6))
+        code_status = ttk.Label(code_frame, text="", style="Sub.TLabel", wraplength=440)
+        code_status.pack(anchor="w")
+
+        verified_email: str | None = None
+        expected_code_hash: bytes | None = None
+        expires_at = 0.0
+
+        def request_code() -> None:
+            nonlocal verified_email, expected_code_hash, expires_at
+            verified_email = None
+            expected_code_hash = None
+            code_entry.delete(0, "end")
+            code_status.configure(text="")
+            try:
+                email = normalize_email(email_entry.get())
+                code = new_verification_code()
+                send_verification_code(email, code)
+            except ProfileError as exc:
+                error.configure(text=str(exc))
+                return
+            except Exception:
+                error.configure(text="Could not send the verification email. Check your connection and settings.")
+                return
+            expected_code_hash = hashlib.sha256(code.encode("ascii")).digest()
+            verified_email = email
+            expires_at = time.monotonic() + 600
+            code_status.configure(text="A verification code was sent. It expires in 10 minutes.")
+            error.configure(text="")
+            verify_button.configure(state="normal")
+            code_entry.focus_set()
+
+        send_button = ttk.Button(outer, text="Send verification code", command=request_code)
+        send_button.pack(anchor="w", pady=(0, 8))
+        code_frame.pack(fill="x", pady=(0, 10))
+
+        def verify_code() -> None:
+            nonlocal verified_email, expected_code_hash
+            if not verified_email or expected_code_hash is None:
+                error.configure(text="Send a verification code first.")
+                return
+            if time.monotonic() > expires_at:
+                verified_email = None
+                expected_code_hash = None
+                error.configure(text="The verification code expired. Request a new code.")
+                return
+            try:
+                entered_email = normalize_email(email_entry.get())
+            except ProfileError as exc:
+                error.configure(text=str(exc))
+                return
+            entered_hash = hashlib.sha256(code_entry.get().strip().encode("utf-8")).digest()
+            if not hmac.compare_digest(entered_email, verified_email) or not hmac.compare_digest(entered_hash, expected_code_hash):
+                error.configure(text="Verification code is incorrect.")
+                return
+            error.configure(text="Email verified. You can create your profile.", style="Sub.TLabel")
+            verify_button.configure(state="disabled")
+
+        verify_button = ttk.Button(code_frame, text="Verify code", command=verify_code)
+        verify_button.pack(anchor="e", pady=(6, 0))
+        verify_button.configure(state="disabled")
 
         ttk.Label(outer, text=f"Password ({PASSWORD_MIN_LENGTH}–{PASSWORD_MAX_LENGTH} characters)").pack(anchor="w")
         password_entry = self._password_entry(outer)
@@ -108,7 +185,18 @@ class LoginFlow:
         error.pack(anchor="w", pady=(4, 4))
 
         def create() -> None:
-            email = email_entry.get()
+            try:
+                email = normalize_email(email_entry.get())
+            except ProfileError as exc:
+                error.configure(text=str(exc), style="Error.TLabel")
+                return
+            if verified_email != email or expected_code_hash is None or time.monotonic() > expires_at or code_entry.get().strip() == "":
+                error.configure(text="Verify the code sent to this email before creating your profile.", style="Error.TLabel")
+                return
+            entered_hash = hashlib.sha256(code_entry.get().strip().encode("utf-8")).digest()
+            if not hmac.compare_digest(entered_hash, expected_code_hash):
+                error.configure(text="Verification code is incorrect.", style="Error.TLabel")
+                return
             password = password_entry.get()
             if password != confirm_entry.get():
                 error.configure(text="Passwords do not match.")
