@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+.uv-cache/
+
+# Private signing key is protected with Windows DPAPI and must never be shared.
+.license_signing_key.dpapi

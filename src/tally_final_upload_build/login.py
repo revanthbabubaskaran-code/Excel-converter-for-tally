@@ -10,6 +10,7 @@ from tkinter import messagebox, ttk
 
 from tally_final_upload_build.app import ExcelForTallyApp
 from tally_final_upload_build.email_verification import new_verification_code, send_verification_code
+from tally_final_upload_build.licensing import LicenseError, activate_license, is_licensed, request_code
 from tally_final_upload_build.profile import (
     PASSWORD_MAX_LENGTH,
     PASSWORD_MIN_LENGTH,
@@ -35,7 +36,15 @@ class LoginFlow:
             messagebox.showerror("Profile could not be loaded", f"{exc}\n\nProfile location:\n{self._profile_location()}", parent=root)
             root.destroy()
             return
-        if self.profile is None:
+        try:
+            licensed = is_licensed()
+        except LicenseError as exc:
+            messagebox.showerror("License could not be loaded", str(exc), parent=root)
+            root.destroy()
+            return
+        if not licensed:
+            self.show_license()
+        elif self.profile is None:
             self.show_setup()
         else:
             self.show_login()
@@ -224,6 +233,59 @@ class LoginFlow:
         button.pack(anchor="e", pady=(13, 0))
         confirm_entry.bind("<Return>", lambda _event: create())
         email_entry.focus_set()
+
+    def show_license(self) -> None:
+        outer = self._content()
+        self.root.geometry("560x600")
+        self.root.minsize(520, 540)
+        ttk.Label(outer, text="License this device", font=("Segoe UI", 13, "bold")).pack(anchor="w", pady=(20, 3))
+        ttk.Label(
+            outer,
+            text="This copy needs a license for this Windows device. Send the request code below to revtechsolutions.tn@gmail.com to receive a device license.",
+            style="Sub.TLabel",
+            wraplength=440,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 14))
+
+        ttk.Label(outer, text="Device license request code").pack(anchor="w")
+        try:
+            code = request_code()
+        except LicenseError as exc:
+            code = ""
+            ttk.Label(outer, text=str(exc), style="Error.TLabel", wraplength=440).pack(anchor="w", pady=(5, 8))
+        request_entry = ttk.Entry(outer, font=("Consolas", 10))
+        request_entry.pack(fill="x", pady=(4, 7))
+        if code:
+            request_entry.insert(0, code)
+
+        def copy_request() -> None:
+            if not code:
+                return
+            self.root.clipboard_clear()
+            self.root.clipboard_append(code)
+            self.root.update()
+            status.configure(text="Request code copied.", style="Sub.TLabel")
+
+        ttk.Button(outer, text="Copy request code", command=copy_request).pack(anchor="e", pady=(0, 16))
+        ttk.Label(outer, text="Paste the license you receive").pack(anchor="w")
+        license_entry = ttk.Entry(outer, font=("Consolas", 10))
+        license_entry.pack(fill="x", pady=(4, 8))
+        status = ttk.Label(outer, text="", style="Error.TLabel", wraplength=440)
+        status.pack(anchor="w", pady=(4, 8))
+
+        def activate() -> None:
+            try:
+                activate_license(license_entry.get())
+            except LicenseError as exc:
+                status.configure(text=str(exc), style="Error.TLabel")
+                return
+            if self.profile is None:
+                self.show_setup()
+            else:
+                self.show_login(info="Device license activated.")
+
+        ttk.Button(outer, text="Activate license", style="Accent.TButton", command=activate).pack(anchor="e", pady=(8, 0))
+        license_entry.focus_set()
 
     def show_login(self, info: str = "") -> None:
         if self.profile is None:

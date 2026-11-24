@@ -5,6 +5,7 @@ description = "Create Tally-ready Excel workbooks from hospital reports"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "cryptography>=46.0.0",
     "openpyxl>=3.1.5",
     "xlrd>=2.0.2",
 ]
