@@ -9,6 +9,8 @@ wheels/
 # Virtual environments
 .venv
 .uv-cache/
+licensing_service/node_modules/
+licensing_service/.wrangler/
 
 # Private signing key is protected with Windows DPAPI and must never be shared.
 .license_signing_key.dpapi

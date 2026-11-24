@@ -8,6 +8,10 @@ import json
 import os
 from pathlib import Path
 import re
+import json
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlsplit
+from urllib.request import Request, urlopen
 import winreg
 
 from cryptography.exceptions import InvalidSignature
@@ -18,6 +22,7 @@ PRODUCT_ID = "excel-for-tally-v1"
 REQUEST_PREFIX = "EFT1-"
 TOKEN_PREFIX = "EFT1"
 LICENSE_FILE = "license.json"
+SERVICE_URL_FILE = "license_service_url.json"
 
 
 class LicenseError(Exception):
@@ -108,6 +113,70 @@ def activate_license(token: str) -> None:
 
 def is_licensed() -> bool:
     return saved_license() is not None
+
+
+def license_service_url() -> str | None:
+    configured = os.environ.get("EXCEL_TALLY_LICENSE_SERVICE_URL", "").strip().rstrip("/")
+    if configured:
+        return configured
+    path = app_data_dir() / SERVICE_URL_FILE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        value = str(data.get("url", "")).strip().rstrip("/")
+        return value or None
+    except FileNotFoundError:
+        return None
+    except (OSError, json.JSONDecodeError, AttributeError) as exc:
+        raise LicenseError("The saved online license service address could not be read.") from exc
+
+
+def save_license_service_url(value: str) -> str:
+    normalized = value.strip().rstrip("/")
+    parsed = urlsplit(normalized)
+    if not parsed.hostname or parsed.scheme not in {"https", "http"}:
+        raise LicenseError("Enter the online license service address (for example, https://your-service.workers.dev).")
+    if parsed.scheme != "https" and parsed.hostname not in {"localhost", "127.0.0.1"}:
+        raise LicenseError("The online license service must use HTTPS.")
+    path = app_data_dir() / SERVICE_URL_FILE
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"url": normalized}), encoding="utf-8")
+    except OSError as exc:
+        raise LicenseError("Could not save the online license service address.") from exc
+    return normalized
+
+
+def _service_json(url: str, method: str, payload: dict | None = None) -> dict:
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    request = Request(url, data=data, method=method, headers={"Content-Type": "application/json"})
+    try:
+        with urlopen(request, timeout=20) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            detail = json.loads(exc.read().decode("utf-8")).get("error", "The license service rejected the request.")
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            detail = "The license service rejected the request."
+        raise LicenseError(str(detail)) from exc
+    except (URLError, TimeoutError, OSError) as exc:
+        raise LicenseError("Could not reach the online license service. Check the service address and internet connection.") from exc
+    except json.JSONDecodeError as exc:
+        raise LicenseError("The online license service returned an invalid response.") from exc
+    if not isinstance(result, dict):
+        raise LicenseError("The online license service returned an invalid response.")
+    return result
+
+
+def submit_online_license_request(code: str, service_url: str) -> dict:
+    parsed = parse_request_code(code)
+    base = save_license_service_url(service_url)
+    return _service_json(f"{base}/api/v1/license-requests", "POST", {"request_code": f"{REQUEST_PREFIX}{parsed}"})
+
+
+def check_online_license_request(code: str, service_url: str) -> dict:
+    parsed = parse_request_code(code)
+    base = save_license_service_url(service_url)
+    return _service_json(f"{base}/api/v1/license-requests/{quote(f'{REQUEST_PREFIX}{parsed}', safe='')}", "GET")
 
 
 def parse_request_code(value: str) -> str:

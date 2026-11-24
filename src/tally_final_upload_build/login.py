@@ -18,7 +18,16 @@ from tally_final_upload_build.gmail_oauth import (
     is_gmail_connected,
     save_gmail_client_id,
 )
-from tally_final_upload_build.licensing import LicenseError, activate_license, is_licensed, request_code
+from tally_final_upload_build.licensing import (
+    LicenseError,
+    activate_license,
+    check_online_license_request,
+    is_licensed,
+    license_service_url,
+    request_code,
+    save_license_service_url,
+    submit_online_license_request,
+)
 from tally_final_upload_build.profile import (
     PASSWORD_MAX_LENGTH,
     PASSWORD_MIN_LENGTH,
@@ -329,26 +338,80 @@ class LoginFlow:
             self.root.update()
             status.configure(text="Request code copied.", style="Sub.TLabel")
 
-        ttk.Button(outer, text="Copy request code", command=copy_request).pack(anchor="e", pady=(0, 16))
-        ttk.Label(outer, text="Paste the license you receive").pack(anchor="w")
-        license_entry = ttk.Entry(outer, font=("Consolas", 10))
-        license_entry.pack(fill="x", pady=(4, 8))
-        status = ttk.Label(outer, text="", style="Error.TLabel", wraplength=440)
+        ttk.Button(outer, text="Copy request code", command=copy_request).pack(anchor="e", pady=(0, 14))
+        ttk.Label(outer, text="Online license service address").pack(anchor="w")
+        service_entry = ttk.Entry(outer, font=("Segoe UI", 10))
+        service_entry.pack(fill="x", pady=(4, 8))
+        try:
+            configured_service = license_service_url()
+        except LicenseError as exc:
+            configured_service = None
+            ttk.Label(outer, text=str(exc), style="Error.TLabel", wraplength=440).pack(anchor="w")
+        if configured_service:
+            service_entry.insert(0, configured_service)
+
+        status = ttk.Label(outer, text="Requests are reviewed by the software owner.", style="Sub.TLabel", wraplength=440)
         status.pack(anchor="w", pady=(4, 8))
 
-        def activate() -> None:
+        def finish_service_call(result: dict | None, failure: str, checking: bool) -> None:
+            request_button.configure(state="normal")
+            check_button.configure(state="normal")
+            if failure:
+                status.configure(text=failure, style="Error.TLabel")
+                return
+            if result is None:
+                status.configure(text="The license service returned no result.", style="Error.TLabel")
+                return
+            state = result.get("status")
+            if state == "approved" and result.get("license_token"):
+                try:
+                    activate_license(str(result["license_token"]))
+                except LicenseError as exc:
+                    status.configure(text=str(exc), style="Error.TLabel")
+                    return
+                if self.profile is None:
+                    self.show_setup()
+                else:
+                    self.show_login(info="Device license activated.")
+            elif state == "pending":
+                status.configure(text="Request submitted. Waiting for owner approval. Click Check status after approval.", style="Sub.TLabel")
+            elif state == "rejected":
+                status.configure(text="The license request was declined. You may submit it again for review.", style="Error.TLabel")
+            elif state == "not_found" and checking:
+                status.configure(text="No request found. Click Request license first.", style="Error.TLabel")
+            else:
+                status.configure(text="The online service returned an unexpected license status.", style="Error.TLabel")
+
+        def run_service_call(checking: bool) -> None:
             try:
-                activate_license(license_entry.get())
+                service_url = save_license_service_url(service_entry.get())
+                request_button.configure(state="disabled")
+                check_button.configure(state="disabled")
+                status.configure(text="Contacting the online license service…", style="Sub.TLabel")
             except LicenseError as exc:
                 status.configure(text=str(exc), style="Error.TLabel")
                 return
-            if self.profile is None:
-                self.show_setup()
-            else:
-                self.show_login(info="Device license activated.")
 
-        ttk.Button(outer, text="Activate license", style="Accent.TButton", command=activate).pack(anchor="e", pady=(8, 0))
-        license_entry.focus_set()
+            def worker() -> None:
+                result: dict | None = None
+                failure = ""
+                try:
+                    if checking:
+                        result = check_online_license_request(code, service_url)
+                    else:
+                        result = submit_online_license_request(code, service_url)
+                except LicenseError as exc:
+                    failure = str(exc)
+                self.root.after(0, lambda: finish_service_call(result, failure, checking))
+
+            threading.Thread(target=worker, daemon=True).start()
+
+        buttons = ttk.Frame(outer)
+        buttons.pack(fill="x", pady=(8, 0))
+        check_button = ttk.Button(buttons, text="Check status", command=lambda: run_service_call(True))
+        check_button.pack(side="left")
+        request_button = ttk.Button(buttons, text="Request license", style="Accent.TButton", command=lambda: run_service_call(False))
+        request_button.pack(side="right")
 
     def show_login(self, info: str = "") -> None:
         if self.profile is None:
