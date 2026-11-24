@@ -19,11 +19,7 @@ The service is designed for Cloudflare Workers and D1. The free tier currently i
 
 The private signing key stays in Cloudflare after deployment. The local `.license_signing_key.dpapi` file is only used to transfer that key once and remains ignored by Git. The service URL is stored locally for the current Windows user. Cloudflare account login and deployment are required to make the service live.
 
-The first run asks you to verify an email address with a randomly generated four-digit numeric code, then create a local profile with a 4–8 character password. The code expires after 10 minutes; a newly requested code replaces the previous one. Email IDs are matched without regard to capitalization. Later runs require those credentials. Passwords are stored as salted hashes; if **Remember me** is selected, a separate copy is encrypted with Windows DPAPI for autofill on the same Windows account.
-
-To send profile verification codes, click **Connect Gmail account** in setup. The app opens the user's default browser for Google sign-in and consent, then sends through the Gmail API; it does not ask for a Gmail password or show the connected email address. Gmail refresh tokens are protected with Windows DPAPI for the current Windows account.
-
-One-time Google setup is required: create a Google Cloud project, enable the Gmail API, configure the OAuth consent screen, and create an OAuth client of type **Desktop app**. The app asks for this public client ID the first time **Connect Gmail account** is clicked and saves it locally. The only requested OAuth scope is `https://www.googleapis.com/auth/gmail.send`. During testing, add the signing-in Gmail account as a test user if Google requires it. See Google's [Desktop app OAuth guide](https://developers.google.com/identity/protocols/oauth2/native-app) and [Gmail API send guide](https://developers.google.com/workspace/gmail/api/guides/sending). If OAuth is not configured or email delivery fails, profile creation remains blocked and the app does not reveal the verification code.
+The first run lets you create a local profile with an email ID and a 4–8 character password; email verification is not required. Email IDs are matched without regard to capitalization. Later runs require those credentials. Passwords are stored as salted hashes; if **Remember me** is selected, a separate copy is encrypted with Windows DPAPI for autofill on the same Windows account.
 
 ## Run on Windows
 
