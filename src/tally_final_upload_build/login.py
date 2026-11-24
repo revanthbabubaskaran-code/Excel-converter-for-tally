@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import threading
 import time
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
 
 from tally_final_upload_build.app import ExcelForTallyApp
 from tally_final_upload_build.email_verification import new_verification_code, send_verification_code
+from tally_final_upload_build.gmail_oauth import (
+    GmailOAuthError,
+    authorize_gmail,
+    gmail_client_id,
+    is_gmail_connected,
+    save_gmail_client_id,
+)
 from tally_final_upload_build.licensing import LicenseError, activate_license, is_licensed, request_code
 from tally_final_upload_build.profile import (
     PASSWORD_MAX_LENGTH,
@@ -116,6 +124,66 @@ class LoginFlow:
         email_entry = ttk.Entry(outer, font=("Segoe UI", 11))
         email_entry.pack(fill="x", pady=(4, 12))
 
+        gmail_row = ttk.Frame(outer)
+        gmail_row.pack(fill="x", pady=(0, 12))
+        gmail_status = ttk.Label(gmail_row, text="", style="Sub.TLabel")
+        gmail_status.pack(side="left", fill="x", expand=True)
+
+        def set_gmail_status(message: str, error_state: bool = False) -> None:
+            gmail_status.configure(text=message, style="Error.TLabel" if error_state else "Sub.TLabel")
+
+        def connect_gmail() -> None:
+            try:
+                client_id = gmail_client_id()
+            except GmailOAuthError as exc:
+                set_gmail_status(str(exc), error_state=True)
+                return
+            if not client_id:
+                client_id = simpledialog.askstring(
+                    "Google OAuth setup",
+                    "Enter the Google OAuth client ID for a Desktop app. This is a public app ID, not a password.",
+                    parent=self.root,
+                )
+                if not client_id:
+                    return
+                try:
+                    save_gmail_client_id(client_id)
+                    client_id = gmail_client_id()
+                except GmailOAuthError as exc:
+                    set_gmail_status(str(exc), error_state=True)
+                    return
+            if not client_id:
+                set_gmail_status("Google OAuth client ID is not configured.", error_state=True)
+                return
+
+            connect_button.configure(state="disabled")
+            set_gmail_status("Complete Google sign-in in your default browser…")
+
+            def authorize() -> None:
+                failure = ""
+                try:
+                    authorize_gmail(client_id)
+                except GmailOAuthError as exc:
+                    failure = str(exc)
+
+                def finish() -> None:
+                    connect_button.configure(state="normal")
+                    if failure:
+                        set_gmail_status(failure, error_state=True)
+                    else:
+                        set_gmail_status("Gmail account connected.")
+
+                self.root.after(0, finish)
+
+            threading.Thread(target=authorize, daemon=True).start()
+
+        connect_button = ttk.Button(gmail_row, text="Connect Gmail account", command=connect_gmail)
+        connect_button.pack(side="right")
+        try:
+            set_gmail_status("Gmail account connected." if is_gmail_connected() else "Connect Gmail to receive verification codes.")
+        except GmailOAuthError as exc:
+            set_gmail_status(str(exc), error_state=True)
+
         code_frame = ttk.Frame(outer)
         ttk.Label(code_frame, text="4-digit email verification code").pack(anchor="w")
         code_vcmd = (self.root.register(self._verification_code_ok), "%P")
@@ -134,6 +202,13 @@ class LoginFlow:
             expected_code_hash = None
             code_entry.delete(0, "end")
             code_status.configure(text="")
+            try:
+                if not is_gmail_connected():
+                    error.configure(text="Connect a Gmail account before requesting a verification code.")
+                    return
+            except GmailOAuthError as exc:
+                error.configure(text=str(exc))
+                return
             try:
                 email = normalize_email(email_entry.get())
                 code = new_verification_code()
