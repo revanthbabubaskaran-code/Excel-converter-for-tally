@@ -1,0 +1,17 @@
+[project]
+name = "tally-final-upload-build"
+version = "0.1.0"
+description = "Create Tally-ready Excel workbooks from hospital reports"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "openpyxl>=3.1.5",
+    "xlrd>=2.0.2",
+]
+
+[project.scripts]
+tally-final-upload-build = "tally_final_upload_build:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
