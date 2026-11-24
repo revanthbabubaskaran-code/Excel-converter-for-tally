@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+from collections.abc import Callable
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -34,8 +35,9 @@ REPORTS = {
 
 
 class ExcelForTallyApp:
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(self, root: tk.Tk, on_logout: Callable[[], None] | None = None) -> None:
         self.root = root
+        self.on_logout = on_logout
         self.root.title("Excel for Tally")
         self.root.geometry("820x650")
         self.root.minsize(720, 560)
@@ -58,7 +60,11 @@ class ExcelForTallyApp:
         outer = ttk.Frame(root, padding=(28, 24, 28, 22))
         outer.pack(fill="both", expand=True)
 
-        ttk.Label(outer, text="Excel for Tally", style="Title.TLabel").pack(anchor="w")
+        heading = ttk.Frame(outer)
+        heading.pack(fill="x")
+        ttk.Label(heading, text="Excel for Tally", style="Title.TLabel").pack(side="left", anchor="w")
+        if self.on_logout is not None:
+            ttk.Button(heading, text="Log out", command=self.on_logout).pack(side="right", anchor="e")
         ttk.Label(
             outer,
             text="Choose your hospital reports and create the formatted Excel workbook on this computer.",
@@ -184,9 +190,9 @@ class ExcelForTallyApp:
 
 
 def main() -> None:
-    root = tk.Tk()
-    ExcelForTallyApp(root)
-    root.mainloop()
+    from tally_final_upload_build.login import main as login_main
+
+    login_main()
 
 
 if __name__ == "__main__":

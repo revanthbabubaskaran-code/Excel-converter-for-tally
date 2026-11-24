@@ -1,5 +1,5 @@
 def main() -> None:
     """Launch the native desktop app."""
-    from tally_final_upload_build.app import main as desktop_main
+    from tally_final_upload_build.login import main as login_main
 
-    desktop_main()
+    login_main()

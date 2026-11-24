@@ -2,6 +2,8 @@
 
 A local Windows desktop app that converts the supplied hospital `.xls` reports into a workbook with the sample output sheet names and columns. It opens as a desktop window and does not use a browser.
 
+The first run asks you to create a local profile with an email ID and a 4–8 character password. Later runs require those credentials. Passwords are stored as salted hashes; if **Remember me** is selected, a separate copy is encrypted with Windows DPAPI for autofill on the same Windows account. Login is checked locally and does not verify ownership of the email address online.
+
 ## Run on Windows
 
 Install Python 3.14 or newer and [uv](https://docs.astral.sh/uv/). Then double-click `Excel for tally.bat`. The launcher installs the project dependencies and opens the app window.
