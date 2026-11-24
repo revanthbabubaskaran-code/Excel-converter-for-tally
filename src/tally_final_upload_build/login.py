@@ -107,6 +107,18 @@ class LoginFlow:
         email_entry = ttk.Entry(outer, font=("Segoe UI", 11))
         email_entry.pack(fill="x", pady=(4, 12))
 
+        ttk.Label(outer, text="Outgoing email: revtechsolutions.tn@gmail.com", style="Sub.TLabel").pack(anchor="w")
+        ttk.Label(outer, text="Google App Password").pack(anchor="w", pady=(8, 0))
+        smtp_password_entry = ttk.Entry(outer, font=("Segoe UI", 11), show="*")
+        smtp_password_entry.pack(fill="x", pady=(4, 10))
+        ttk.Label(
+            outer,
+            text="Enter an App Password for the sending Gmail account. It is used only to send this email and is not saved in the profile.",
+            style="Sub.TLabel",
+            wraplength=440,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 8))
+
         code_frame = ttk.Frame(outer)
         ttk.Label(code_frame, text="4-digit email verification code").pack(anchor="w")
         code_vcmd = (self.root.register(self._verification_code_ok), "%P")
@@ -128,7 +140,7 @@ class LoginFlow:
             try:
                 email = normalize_email(email_entry.get())
                 code = new_verification_code()
-                send_verification_code(email, code)
+                send_verification_code(email, code, smtp_password_entry.get())
             except ProfileError as exc:
                 error.configure(text=str(exc))
                 return

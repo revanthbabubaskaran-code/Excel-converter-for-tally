@@ -1,4 +1,4 @@
-"""Send short lived email verification codes using configured SMTP."""
+"""Send short lived email verification codes through Gmail or configured SMTP."""
 
 from __future__ import annotations
 
@@ -10,19 +10,21 @@ import ssl
 
 from tally_final_upload_build.profile import ProfileError, normalize_email
 
+DEFAULT_SMTP_HOST = "smtp.gmail.com"
+DEFAULT_SMTP_PORT = "587"
+DEFAULT_SMTP_USERNAME = "revtechsolutions.tn@gmail.com"
 
-def send_verification_code(email: str, code: str) -> None:
-    """Send a verification code; credentials must come from environment variables."""
-    host = os.environ.get("EXCEL_TALLY_SMTP_HOST", "").strip()
-    port_text = os.environ.get("EXCEL_TALLY_SMTP_PORT", "587").strip()
-    username = os.environ.get("EXCEL_TALLY_SMTP_USERNAME", "").strip()
-    password = os.environ.get("EXCEL_TALLY_SMTP_PASSWORD", "")
+
+def send_verification_code(email: str, code: str, smtp_password: str = "") -> None:
+    """Send a verification code using a supplied or environment-provided SMTP password."""
+    host = os.environ.get("EXCEL_TALLY_SMTP_HOST", DEFAULT_SMTP_HOST).strip()
+    port_text = os.environ.get("EXCEL_TALLY_SMTP_PORT", DEFAULT_SMTP_PORT).strip()
+    username = os.environ.get("EXCEL_TALLY_SMTP_USERNAME", DEFAULT_SMTP_USERNAME).strip()
+    password = (smtp_password or os.environ.get("EXCEL_TALLY_SMTP_PASSWORD", "")).replace(" ", "")
     sender = os.environ.get("EXCEL_TALLY_SMTP_FROM", username).strip()
     if not all((host, username, password, sender)):
         raise ProfileError(
-            "Email verification is not configured. Set EXCEL_TALLY_SMTP_HOST, "
-            "EXCEL_TALLY_SMTP_PORT, EXCEL_TALLY_SMTP_USERNAME, "
-            "EXCEL_TALLY_SMTP_PASSWORD, and EXCEL_TALLY_SMTP_FROM, then restart the app."
+            f"Enter the Google App Password for {DEFAULT_SMTP_USERNAME} to send the verification code."
         )
     try:
         port = int(port_text)
