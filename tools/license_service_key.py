@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 from pathlib import Path
+import secrets
 import sys
 
 from cryptography.hazmat.primitives import serialization
@@ -11,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 ROOT = Path(__file__).resolve().parents[1]
 PRIVATE_KEY_FILE = ROOT / ".license_signing_key.dpapi"
+ADMIN_TOKEN_FILE = ROOT / ".license_admin_token.dpapi"
 PUBLIC_KEY_FILE = ROOT / "src" / "tally_final_upload_build" / "license_public_key.txt"
 
 
@@ -45,15 +47,41 @@ def export_signing_key() -> None:
     print(base64.b64encode(private_bytes).decode("ascii"))
 
 
+def initialize_admin_token() -> None:
+    if ADMIN_TOKEN_FILE.exists():
+        raise SystemExit("An owner access token already exists; refusing to replace it.")
+    from tally_final_upload_build.profile import protect_for_current_user
+
+    token = secrets.token_urlsafe(32)
+    ADMIN_TOKEN_FILE.write_bytes(protect_for_current_user(token.encode("ascii")))
+    print(f"Owner access token saved encrypted for this Windows account: {ADMIN_TOKEN_FILE}")
+    print("The token was not printed. Export it only when setting the Cloudflare LICENSE_ADMIN_TOKEN secret.")
+
+
+def export_admin_token() -> None:
+    from tally_final_upload_build.profile import unprotect_for_current_user
+
+    if not ADMIN_TOKEN_FILE.exists():
+        raise SystemExit("Owner access token not found. Run this tool with 'init-admin-token' first.")
+    token = unprotect_for_current_user(ADMIN_TOKEN_FILE.read_bytes())
+    print(token.decode("ascii"))
+
+
 def main() -> None:
     if len(sys.argv) == 2 and sys.argv[1].casefold() == "init":
         initialize()
     elif len(sys.argv) == 2 and sys.argv[1].casefold() == "export-signing-key":
         export_signing_key()
+    elif len(sys.argv) == 2 and sys.argv[1].casefold() == "init-admin-token":
+        initialize_admin_token()
+    elif len(sys.argv) == 2 and sys.argv[1].casefold() == "export-admin-token":
+        export_admin_token()
     else:
         print("Owner online license service key tool")
         print("  uv run python tools/license_service_key.py init")
         print("  uv run python tools/license_service_key.py export-signing-key")
+        print("  uv run python tools/license_service_key.py init-admin-token")
+        print("  uv run python tools/license_service_key.py export-admin-token")
         raise SystemExit(2)
 
 
