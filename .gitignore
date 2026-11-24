@@ -14,3 +14,4 @@ licensing_service/.wrangler/
 
 # Private signing key is protected with Windows DPAPI and must never be shared.
 .license_signing_key.dpapi
+.license_admin_token.dpapi
