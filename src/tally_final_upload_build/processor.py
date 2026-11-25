@@ -1,16 +1,18 @@
-"""Convert hospital reports into the sample Tally import workbook layout."""
+"""Convert hospital reports into the supplied Tally workbook layout."""
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from copy import copy
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Iterable
-from openpyxl.styles import Font, PatternFill
+import re
+from typing import Any
 
 import xlrd
-from openpyxl import Workbook, load_workbook
-from openpyxl.utils import get_column_letter
+from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter, range_boundaries
 
 
 SALES_HEADERS = [
@@ -23,43 +25,61 @@ VOUCHER_HEADERS = ["Date", "Rec No", "Bank / Cash", "Credit Account", "Amount", 
 PAYMENT_HEADERS = ["Date", "Payment No", "Bank / Cash", "Debit Account", "Amount", "Cheque No", "Chk Date", "Narration"]
 JOURNAL_HEADERS = ["VCH Type", "Bill Number", "Bill Date", "Doctor", "Debit Amt", "Item Value", "Narration"]
 DISCOUNT_HEADERS = JOURNAL_HEADERS + [""] * 9
-DOCTOR_HEADERS = JOURNAL_HEADERS + [""]
+DOCTOR_HEADERS = JOURNAL_HEADERS + [""] * 2
 PAYTM_HEADERS = VOUCHER_HEADERS + ["", ""]
+FORMULA_HEADERS = [""] * 13
+
+SHEET_HEADERS = {
+    "Auto Sales": SALES_HEADERS,
+    "Advances": VOUCHER_HEADERS,
+    "Receipt": VOUCHER_HEADERS,
+    "Discount Allowed": DISCOUNT_HEADERS,
+    "Doctor Fees": DOCTOR_HEADERS,
+    "Auto Payment": PAYMENT_HEADERS,
+    "Paytm": PAYTM_HEADERS,
+    "Formula": FORMULA_HEADERS,
+}
+LAYOUT_TEMPLATE = Path(__file__).resolve().parent / "data" / "output_layout_template.xlsx"
 
 
 def _clean_header(value: Any) -> str:
-    return " ".join(str(value or "").strip().casefold().split())
+    text = str(value or "").strip().casefold()
+    return re.sub(r"[^a-z0-9]+", "", text)
 
 
 def _rows_from_upload(filename: str, payload: bytes) -> tuple[list[str], list[list[Any]]]:
-    """Read the first worksheet from legacy .xls or modern .xlsx files."""
+    """Read the first sheet of a legacy .xls or modern .xlsx workbook."""
     suffix = Path(filename).suffix.casefold()
     if suffix == ".xls":
         book = xlrd.open_workbook(file_contents=payload, on_demand=True)
-        sheet = book.sheet_by_index(0)
-        rows: list[list[Any]] = []
-        for row_index in range(sheet.nrows):
-            values: list[Any] = []
-            for col_index in range(sheet.ncols):
-                cell = sheet.cell(row_index, col_index)
-                value = cell.value
-                if cell.ctype == xlrd.XL_CELL_DATE:
-                    value = xlrd.xldate.xldate_as_datetime(value, book.datemode)
-                elif cell.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
-                    value = None
-                values.append(value)
-            rows.append(values)
-        book.release_resources()
+        try:
+            sheet = book.sheet_by_index(0)
+            rows: list[list[Any]] = []
+            for row_index in range(sheet.nrows):
+                values: list[Any] = []
+                for col_index in range(sheet.ncols):
+                    cell = sheet.cell(row_index, col_index)
+                    value = cell.value
+                    if cell.ctype == xlrd.XL_CELL_DATE:
+                        value = xlrd.xldate.xldate_as_datetime(value, book.datemode)
+                    elif cell.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
+                        value = None
+                    values.append(value)
+                rows.append(values)
+        finally:
+            book.release_resources()
     elif suffix == ".xlsx":
         book = load_workbook(BytesIO(payload), read_only=True, data_only=True)
-        sheet = book.active
-        rows = [list(row) for row in sheet.iter_rows(values_only=True)]
-        book.close()
+        try:
+            sheet = book.active
+            rows = [list(row) for row in sheet.iter_rows(values_only=True)]
+        finally:
+            book.close()
     else:
         raise ValueError(f"{filename}: expected an .xls or .xlsx file")
 
     header_index = next(
-        (i for i, row in enumerate(rows[:30]) if sum(v is not None and str(v).strip() != "" for v in row) >= 3),
+        (index for index, row in enumerate(rows[:30]) if sum(bool(v is not None and str(v).strip()) for v in row) >= 3),
         None,
     )
     if header_index is None:
@@ -69,7 +89,7 @@ def _rows_from_upload(filename: str, payload: bytes) -> tuple[list[str], list[li
 
 
 def _column(headers: list[str], name: str, *aliases: str) -> int:
-    normalized = {_clean_header(header): i for i, header in enumerate(headers) if header}
+    normalized = {_clean_header(header): index for index, header in enumerate(headers) if header}
     for candidate in (name, *aliases):
         key = _clean_header(candidate)
         if key in normalized:
@@ -89,42 +109,43 @@ def _has_values(row: list[Any]) -> bool:
     return any(value is not None and str(value).strip() for value in row)
 
 
-def _party(visit_no: Any, name: Any) -> str:
-    visit = str(visit_no or "").strip()
-    patient = str(name or "").strip()
-    if visit and patient:
-        return f"{visit}-{patient}"
-    return visit or patient
+def _party(visit_number: Any, patient_name: Any) -> str:
+    visit = str(visit_number or "").strip()
+    patient = str(patient_name or "").strip()
+    return f"{visit}-{patient}" if visit and patient else visit or patient
 
 
-def _date(value: Any) -> Any:
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, date):
-        return value
-    if isinstance(value, str):
-        text = value.strip()
-        for fmt in ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d", "%m/%d/%Y"):
-            try:
-                return datetime.strptime(text, fmt).date()
-            except ValueError:
-                pass
-    return value
-
-
-def _datetime(value: Any) -> Any:
+def _datetime(value: Any) -> datetime | None:
     if isinstance(value, datetime):
         return value
     if isinstance(value, date):
         return datetime.combine(value, datetime.min.time())
     if isinstance(value, str):
         text = value.strip()
-        for fmt in ("%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
+        for pattern in (
+            "%Y-%m-%d %H:%M:%S",
+            "%d/%m/%Y %H:%M:%S",
+            "%d/%m/%Y",
+            "%d/%m/%y",
+            "%Y-%m-%d",
+            "%m/%d/%Y",
+        ):
             try:
-                return datetime.strptime(text, fmt)
+                return datetime.strptime(text, pattern)
             except ValueError:
-                pass
-    return value
+                continue
+    return None
+
+
+def _date_text(value: Any, *, four_digit_year: bool) -> str:
+    parsed = _datetime(value)
+    if parsed is None:
+        return str(value or "").strip()
+    return parsed.strftime("%d/%m/%Y" if four_digit_year else "%d/%m/%y")
+
+
+def _date_sort_key(value: Any) -> datetime:
+    return _datetime(value) or datetime.min
 
 
 def _amount(value: Any) -> Any:
@@ -138,132 +159,209 @@ def _amount(value: Any) -> Any:
 
 
 def _bank(mode: Any) -> str:
-    text = str(mode or "").strip().upper()
-    if text in {"UPI", "CARD"}:
+    text = str(mode or "").strip()
+    key = _clean_header(text)
+    if key in {"upi", "card", "ubi", "unionbankofindia"}:
         return "UBI"
-    if text == "EFT":
+    if key in {"eft", "indianoverseasbankca3762", "iob"}:
         return "Indian Overseas Bank C.A 3762"
+    if key == "cash":
+        return "CASH"
     return text
 
 
 def sales_rows(filename: str, payload: bytes) -> list[list[Any]]:
-    headers, rows = _rows_from_upload(filename, payload)
-    bill = _column(headers, "Bill Number")
-    bill_date = _column(headers, "Bill Date")
-    visit = _column(headers, "Visit Number")
-    patient = _column(headers, "Patient Name")
-    service = _column(headers, "Services / Charge Name")
-    item_value = _column(headers, "Item Value")
-    discount = _column(headers, "Discount")
-    result = []
-    for row in rows:
+    headers, source = _rows_from_upload(filename, payload)
+    _column(headers, "Bill Number")
+    _column(headers, "Bill Date")
+    _column(headers, "Visit Number")
+    _column(headers, "Patient Name")
+    _column(headers, "Services / Charge Name")
+    _column(headers, "Item Value")
+    _column(headers, "Discount")
+
+    indexed_rows: list[tuple[str, int, list[Any]]] = []
+    for index, row in enumerate(source):
         if not _has_values(row):
             continue
-        party = _party(row[visit], row[patient])
-        amount = _amount(row[item_value])
-        result.append([
-            row[bill], _date(row[bill_date]), party, "Auto Sales", "", "Tamil Nadu",
-            "", "", "", "", 0, amount, 0, 0, 0, 0, 0, amount,
-            party, _amount(row[discount]), row[service],
-        ])
-    return result
+        bill = _get(row, headers, "Bill Number")
+        bill_date = _get(row, headers, "Bill Date")
+        party = _party(_get(row, headers, "Visit Number"), _get(row, headers, "Patient Name"))
+        amount = _amount(_get(row, headers, "Item Value"))
+        result = [
+            bill, _date_text(bill_date, four_digit_year=True), party, "Auto Sales", None, "Tamil Nadu",
+            None, None, None, None, 0, amount, 0, 0, 0, 0, 0, amount,
+            party, _amount(_get(row, headers, "Discount")), _get(row, headers, "Services / Charge Name"),
+        ]
+        indexed_rows.append((str(bill or ""), index, result))
+    indexed_rows.sort(key=lambda item: (item[0], item[1]))
+    return [row for _, _, row in indexed_rows]
 
 
-def receipt_rows(filename: str, payload: bytes, *, advance: bool = False) -> list[list[Any]]:
-    headers, rows = _rows_from_upload(filename, payload)
-    number = _column(headers, "Receipt Number")
-    date_col = _column(headers, "Receipt Date")
-    visit = _column(headers, "Visit Number")
-    patient = _column(headers, "Patient Name")
-    mode = _column(headers, "Mode")
-    cheque = _column(headers, "DD / Cheque Info")
-    amount = _column(headers, "Receipt Value")
-    result = []
-    for row in rows:
+def receipt_rows(filename: str, payload: bytes) -> list[list[Any]]:
+    headers, source = _rows_from_upload(filename, payload)
+    _column(headers, "Receipt Number")
+    _column(headers, "Receipt Date")
+    _column(headers, "Visit Number")
+    _column(headers, "Patient Name")
+    _column(headers, "Mode")
+    _column(headers, "Receipt Value")
+
+    indexed_rows: list[tuple[datetime, int, list[Any]]] = []
+    for index, row in enumerate(source):
         if not _has_values(row):
             continue
-        party = _party(row[visit], row[patient])
-        result.append([
-            _date(row[date_col]), row[number], _bank(row[mode]), party,
-            _amount(row[amount]), row[cheque], "", party,
-        ])
-    return result
+        party = _party(_get(row, headers, "Visit Number"), _get(row, headers, "Patient Name"))
+        receipt_date = _get(row, headers, "Receipt Date")
+        output = [
+            _date_text(receipt_date, four_digit_year=False),
+            _get(row, headers, "Receipt Number"),
+            _bank(_get(row, headers, "Mode")),
+            party,
+            _amount(_get(row, headers, "Receipt Value")),
+            _get(row, headers, "DD / Cheque Info"),
+            None,
+            party,
+        ]
+        indexed_rows.append((_date_sort_key(receipt_date), index, output))
+    indexed_rows.sort(key=lambda item: (item[0], item[1]))
+    return [row for _, _, row in indexed_rows]
 
 
 def refund_rows(filename: str, payload: bytes) -> list[list[Any]]:
-    headers, rows = _rows_from_upload(filename, payload)
-    result = []
-    for row in rows:
+    headers, source = _rows_from_upload(filename, payload)
+    indexed_rows: list[tuple[datetime, int, list[Any]]] = []
+    for index, row in enumerate(source):
         if not _has_values(row):
             continue
-        party = _party(_get(row, headers, "Visit No"), _get(row, headers, "Patient Name"))
-        result.append([
-            _date(_get(row, headers, "Payment Date")), _get(row, headers, "Payment Number"),
-            _bank(_get(row, headers, "Mode")), party,
+        payment_date = _get(row, headers, "Payment Date")
+        party = _party(_get(row, headers, "Visit No", "Visit Number"), _get(row, headers, "Patient Name"))
+        output = [
+            _date_text(payment_date, four_digit_year=True),
+            _get(row, headers, "Payment Number"),
+            _bank(_get(row, headers, "Mode")),
+            party,
             _amount(_get(row, headers, "Payment Value")),
-            _get(row, headers, "Cheque No."), "", party,
-        ])
-    return result
+            _get(row, headers, "Cheque No."),
+            None,
+            party,
+        ]
+        indexed_rows.append((_date_sort_key(payment_date), index, output))
+    indexed_rows.sort(key=lambda item: (item[0], item[1]))
+    return [row for _, _, row in indexed_rows]
 
 
 def discount_rows(filename: str, payload: bytes) -> list[list[Any]]:
-    headers, rows = _rows_from_upload(filename, payload)
-    result = []
-    for row in rows:
+    headers, source = _rows_from_upload(filename, payload)
+    value_column = _column(headers, "Net Discount Value", "Discount Value")
+    result: list[list[Any]] = []
+    for row in source:
         if not _has_values(row):
             continue
         party = _party(_get(row, headers, "Visit Number"), _get(row, headers, "Patient Name"))
         bill = _get(row, headers, "Bill No")
         bill_date = _datetime(_get(row, headers, "Bill Time"))
-        value = _amount(_get(row, headers, "Discount Value"))
-        result.append(["Auto Journal", bill, bill_date, "Discount Allowed", value, "", party])
-        result.append(["Auto Journal", bill, bill_date, party, "", value, party])
+        value = _amount(row[value_column])
+        result.append(["Auto Journal", bill, bill_date, "Discount Allowed", value, None, party])
+        result.append(["Auto Journal", bill, bill_date, party, None, value, party])
     return result
 
 
-def doctor_fee_rows(filename: str, payload: bytes) -> list[list[Any]]:
-    headers, rows = _rows_from_upload(filename, payload)
-    result = []
-    for row in rows:
+def doctor_fee_rows(filename: str, payload: bytes, *, voucher_start: int = 943) -> list[list[Any]]:
+    headers, source = _rows_from_upload(filename, payload)
+    result: list[list[Any]] = []
+    sequence = voucher_start
+    for row in source:
         if not _has_values(row):
             continue
         party = _party(_get(row, headers, "Visit Number"), _get(row, headers, "Patient Name"))
         bill_date = _datetime(_get(row, headers, "Bill Date"))
-        bill = _get(row, headers, "Bill Number")
         value = _amount(_get(row, headers, "Net Value"))
         doctor = _get(row, headers, "Doctor")
-        result.append(["Auto Journal", bill, bill_date, "Professional Charges", value, "", party])
-        result.append(["Auto Journal", bill, bill_date, doctor, "", value, party])
+        voucher_number = f"DOC/{sequence:04d}"
+        sequence += 1
+        result.append(["Auto Journal", voucher_number, bill_date, "Professional Charges", value, None, party])
+        result.append(["Auto Journal", voucher_number, bill_date, doctor, None, value, party])
     return result
 
 
+def formula_rows(filename: str, payload: bytes) -> list[list[Any]]:
+    headers, source = _rows_from_upload(filename, payload)
+    result: list[list[Any]] = []
+    for row in source:
+        if not _has_values(row):
+            continue
+        row_number = len(result) + 2
+        category = _get(row, headers, "Bill Category")
+        if _clean_header(category) == "ipbill":
+            category = "IP"
+        result.append([
+            None,
+            _get(row, headers, "Bill No"),
+            category,
+            _datetime(_get(row, headers, "Bill Time")),
+            _get(row, headers, "MRN"),
+            _get(row, headers, "IP No #", "IP No"),
+            _get(row, headers, "Patient Name"),
+            f'=CONCATENATE(F{row_number},"-",G{row_number})',
+            None, None, None, None, None,
+        ])
+    return result
+
+
+def _copy_row_style(sheet: Any, source_row: int, target_row: int, max_column: int) -> None:
+    if target_row == source_row:
+        return
+    if sheet.row_dimensions[source_row].height is not None:
+        sheet.row_dimensions[target_row].height = sheet.row_dimensions[source_row].height
+    for column in range(1, max_column + 1):
+        source = sheet.cell(source_row, column)
+        target = sheet.cell(target_row, column)
+        if source.has_style:
+            target._style = copy(source._style)
+        if source.number_format:
+            target.number_format = source.number_format
+
+
 def make_workbook(tables: dict[str, tuple[list[str], Iterable[list[Any]]]]) -> bytes:
-    book = Workbook()
-    book.remove(book.active)
-    for title, (headers, rows) in tables.items():
-        sheet = book.create_sheet(title)
-        sheet.append(headers)
-        for row in rows:
-            sheet.append(row + [""] * max(0, len(headers) - len(row)))
-        sheet.freeze_panes = "A2"
-        sheet.auto_filter.ref = sheet.dimensions
-        for cell in sheet[1]:
-            cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill("solid", fgColor="245A73")
-        for column in sheet.columns:
-            values = [len(str(cell.value)) for cell in list(column)[:300] if cell.value is not None]
-            sheet.column_dimensions[get_column_letter(column[0].column)].width = min(max(max(values, default=10) + 2, 12), 40)
-        for row in sheet.iter_rows(min_row=2):
-            for cell in row:
-                if isinstance(cell.value, (date, datetime)):
-                    if title in {"Advances", "Receipt"}:
-                        cell.number_format = "dd/mm/yy"
-                    elif title in {"Discount Allowed", "Doctor Fees"}:
-                        cell.number_format = "yyyy-mm-dd hh:mm:ss.000"
-                    elif title == "Paytm":
-                        cell.number_format = "yyyy-mm-dd"
-                    else:
-                        cell.number_format = "dd/mm/yyyy"
-    output = BytesIO()
-    book.save(output)
-    return output.getvalue()
+    """Fill the sanitized sample layout and return one multi-sheet .xlsx file."""
+    if not LAYOUT_TEMPLATE.exists():
+        raise FileNotFoundError(f"Output layout template not found: {LAYOUT_TEMPLATE}")
+
+    book = load_workbook(LAYOUT_TEMPLATE)
+    try:
+        for sheet_name, headers in SHEET_HEADERS.items():
+            if sheet_name not in book.sheetnames:
+                raise ValueError(f"Output layout is missing the {sheet_name} sheet.")
+            sheet = book[sheet_name]
+            for cell in list(sheet._cells.values()):
+                if cell.row > 1:
+                    cell.value = None
+                    cell.comment = None
+                    cell.hyperlink = None
+
+            if sheet_name not in tables:
+                data_rows: list[list[Any]] = []
+            else:
+                _, iterable_rows = tables[sheet_name]
+                data_rows = [list(row) for row in iterable_rows]
+
+            max_column = max(sheet.max_column, len(headers))
+            for row_number, values in enumerate(data_rows, start=2):
+                if row_number > sheet.max_row or not any(
+                    sheet.cell(row_number, column).has_style for column in range(1, max_column + 1)
+                ):
+                    _copy_row_style(sheet, 2, row_number, max_column)
+                for column in range(1, max_column + 1):
+                    sheet.cell(row_number, column).value = values[column - 1] if column <= len(values) else None
+
+            if sheet.auto_filter.ref:
+                min_col, _, max_col, _ = range_boundaries(sheet.auto_filter.ref)
+                last_column = get_column_letter(max_col or len(headers))
+                sheet.auto_filter.ref = f"{get_column_letter(min_col or 1)}1:{last_column}{len(data_rows) + 1}"
+
+        output = BytesIO()
+        book.save(output)
+        return output.getvalue()
+    finally:
+        book.close()

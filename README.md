@@ -34,19 +34,20 @@ uv run tally-final-upload-build
 
 ## Reports to select
 
-Select these six Excel reports in the app:
+Select one or more of these Excel reports in the app:
 
 - Charge Item Report
+- IP Bill Report
 - Doctor Fees Report
 - IP Advance Report
 - IP Discount Report
 - IP Receipt Report
 - IP Refund Report
 
-The IP Bill Report is not used because the supplied sample output has no matching sheet. The PDF bank statement is ignored.
+The PDF bank statement is ignored. The output always has the same eight sheets as the supplied sample; sheets whose source report was not selected remain blank. The Paytm sheet remains blank because there is no Paytm receipt report among the inputs.
 
 ## Output notes
 
-The workbook contains `Auto Sales`, `Advances`, `Receipt`, `Discount Allowed`, `Doctor Fees`, `Auto Payment`, `Paytm`, and `Formula` sheets. The Paytm and Formula sheets are empty apart from their headers: the sample's 662 Paytm rows are not present in the supplied Excel reports. No bank statement data is read.
+Choose one `.xlsx` output file. It contains all eight sheets in the sample workbook's order and layout: `Auto Sales`, `Advances`, `Receipt`, `Discount Allowed`, `Doctor Fees`, `Auto Payment`, `Paytm`, and `Formula`. The IP Bill Report populates the `Formula` sheet. Reports that were not selected leave their corresponding sheets blank, and `Paytm` stays blank. No bank statement data is read.
 
 The conversion rules are based on the July 2026 examples. Review the generated workbook before importing it into accounting software, especially if report columns or formats change.

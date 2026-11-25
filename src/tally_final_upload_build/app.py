@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
 from pathlib import Path
 from collections.abc import Callable
 import tkinter as tk
@@ -11,12 +10,13 @@ from tkinter import filedialog, messagebox, ttk
 from tally_final_upload_build.processor import (
     DISCOUNT_HEADERS,
     DOCTOR_HEADERS,
+    FORMULA_HEADERS,
     PAYMENT_HEADERS,
-    PAYTM_HEADERS,
     SALES_HEADERS,
     VOUCHER_HEADERS,
     discount_rows,
     doctor_fee_rows,
+    formula_rows,
     make_workbook,
     receipt_rows,
     refund_rows,
@@ -26,6 +26,7 @@ from tally_final_upload_build.processor import (
 
 REPORTS = {
     "charge": ("Charge Item Report", "charge item"),
+    "bill": ("IP Bill Report", "ip bill"),
     "doctor": ("Doctor Fees Report", "doctor fee"),
     "advance": ("IP Advance Report", "ip advance"),
     "discount": ("IP Discount Report", "ip discount"),
@@ -39,8 +40,8 @@ class ExcelForTallyApp:
         self.root = root
         self.on_logout = on_logout
         self.root.title("Excel for Tally")
-        self.root.geometry("820x650")
-        self.root.minsize(720, 560)
+        self.root.geometry("850x735")
+        self.root.minsize(760, 680)
         self.root.configure(bg="#f3f6f8")
         self.paths: dict[str, Path] = {}
         self.file_labels: dict[str, ttk.Label] = {}
@@ -57,9 +58,8 @@ class ExcelForTallyApp:
         style.configure("TButton", font=("Segoe UI", 10), padding=(10, 7))
         style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=(14, 9))
 
-        outer = ttk.Frame(root, padding=(28, 24, 28, 22))
+        outer = ttk.Frame(root, padding=(28, 22, 28, 20))
         outer.pack(fill="both", expand=True)
-
         heading = ttk.Frame(outer)
         heading.pack(fill="x")
         ttk.Label(heading, text="Excel for Tally", style="Title.TLabel").pack(side="left", anchor="w")
@@ -67,52 +67,36 @@ class ExcelForTallyApp:
             ttk.Button(heading, text="Log out", command=self.on_logout).pack(side="right", anchor="e")
         ttk.Label(
             outer,
-            text="Choose your hospital reports and create the formatted Excel workbook on this computer.",
+            text="Choose the hospital Excel reports and create one workbook in the sample format.",
             style="Sub.TLabel",
-            wraplength=760,
-        ).pack(anchor="w", pady=(5, 18))
+            wraplength=780,
+        ).pack(anchor="w", pady=(5, 16))
 
-        note = ttk.Frame(outer, style="Card.TFrame", padding=13)
-        note.pack(fill="x", pady=(0, 16))
-        ttk.Label(
-            note,
-            text=(
-                "The PDF bank statement is ignored. The sample's Paytm tab has 662 OP receipt rows, "
-                "but those records are not present in the supplied Excel reports; the generated Paytm "
-                "tab will contain its headers only."
-            ),
-            style="Card.TLabel",
-            wraplength=720,
-            justify="left",
-        ).pack(anchor="w")
-
-        ttk.Label(outer, text="Required Excel reports", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(0, 8))
-        reports_card = ttk.Frame(outer, style="Card.TFrame", padding=(14, 8, 14, 10))
+        ttk.Label(outer, text="Excel reports (select one or more)", font=("Segoe UI", 12, "bold")).pack(
+            anchor="w", pady=(0, 8)
+        )
+        reports_card = ttk.Frame(outer, style="Card.TFrame", padding=(14, 6, 14, 8))
         reports_card.pack(fill="x")
-
         for key, (title, _) in REPORTS.items():
             row = ttk.Frame(reports_card, style="Card.TFrame")
-            row.pack(fill="x", pady=5)
+            row.pack(fill="x", pady=3)
             ttk.Label(row, text=title, style="Card.TLabel", width=22).pack(side="left", anchor="w")
-            file_label = ttk.Label(row, text="No file selected", style="Path.TLabel", width=43, anchor="w")
+            file_label = ttk.Label(row, text="No file selected", style="Path.TLabel", width=48, anchor="w")
             file_label.pack(side="left", fill="x", expand=True, padx=(8, 10))
             self.file_labels[key] = file_label
             ttk.Button(row, text="Browse…", command=lambda report_key=key: self.choose_file(report_key)).pack(side="right")
 
         footer = ttk.Frame(outer)
-        footer.pack(fill="x", pady=(15, 0))
-        ttk.Label(
-            footer,
-            text="IP Bill Report is not used because the sample output has no matching sheet.",
-            style="Sub.TLabel",
-        ).pack(anchor="w")
-        ttk.Label(footer, text="All file processing happens locally on this computer.", style="Sub.TLabel").pack(anchor="w", pady=(3, 0))
+        footer.pack(fill="x", pady=(12, 0))
+        ttk.Label(footer, text="All file processing happens locally on this computer.", style="Sub.TLabel").pack(anchor="w")
 
         bottom = ttk.Frame(outer)
-        bottom.pack(fill="x", side="bottom", pady=(18, 0))
-        self.status = ttk.Label(bottom, text="Select all six reports to continue.", style="Sub.TLabel")
+        bottom.pack(fill="x", side="bottom", pady=(14, 0))
+        self.status = ttk.Label(bottom, text="Select one or more reports to continue.", style="Sub.TLabel")
         self.status.pack(side="left", fill="x", expand=True)
-        self.generate_button = ttk.Button(bottom, text="Create output Excel", style="Accent.TButton", command=self.create_output)
+        self.generate_button = ttk.Button(
+            bottom, text="Create output workbook", style="Accent.TButton", command=self.create_output
+        )
         self.generate_button.pack(side="right")
         self.update_ready_state()
 
@@ -129,23 +113,29 @@ class ExcelForTallyApp:
         self.update_ready_state()
 
     def update_ready_state(self) -> None:
-        missing = [REPORTS[key][0] for key in REPORTS if key not in self.paths]
-        self.generate_button.configure(state="normal" if not missing else "disabled")
-        if missing:
-            self.status.configure(text=f"Still needed: {', '.join(missing)}")
-        else:
-            self.status.configure(text="All required reports are ready.")
+        self.generate_button.configure(state="normal" if self.paths else "disabled")
+        self.status.configure(
+            text=f"{len(self.paths)} of {len(REPORTS)} reports selected."
+            if self.paths else "Select one or more reports to continue."
+        )
 
     def create_output(self) -> None:
-        suggested = f"Tally_Final_Output_{date.today():%Y%m%d}.xlsx"
         output_path = filedialog.asksaveasfilename(
             parent=self.root,
-            title="Save output workbook",
-            initialfile=suggested,
+            title="Save formatted output workbook",
             defaultextension=".xlsx",
+            initialfile="Tally_Output.xlsx",
             filetypes=[("Excel workbook", "*.xlsx")],
         )
         if not output_path:
+            return
+        destination = Path(output_path)
+        if destination.exists() and not messagebox.askyesno(
+            "Replace existing workbook?",
+            f"{destination.name} already exists. Replace it?",
+            parent=self.root,
+        ):
+            self.status.configure(text="Output was not created.")
             return
 
         self.generate_button.configure(state="disabled")
@@ -156,30 +146,62 @@ class ExcelForTallyApp:
                 path = self.paths[key]
                 return path.name, path.read_bytes()
 
-            charge_name, charge_bytes = read("charge")
-            doctor_name, doctor_bytes = read("doctor")
-            advance_name, advance_bytes = read("advance")
-            discount_name, discount_bytes = read("discount")
-            receipt_name, receipt_bytes = read("receipt")
-            refund_name, refund_bytes = read("refund")
-
-            tables = {
-                "Auto Sales": (SALES_HEADERS, sales_rows(charge_name, charge_bytes)),
-                "Advances": (VOUCHER_HEADERS, receipt_rows(advance_name, advance_bytes)),
-                "Receipt": (VOUCHER_HEADERS, receipt_rows(receipt_name, receipt_bytes)),
-                "Discount Allowed": (DISCOUNT_HEADERS, discount_rows(discount_name, discount_bytes)),
-                "Doctor Fees": (DOCTOR_HEADERS, doctor_fee_rows(doctor_name, doctor_bytes)),
-                "Auto Payment": (PAYMENT_HEADERS, refund_rows(refund_name, refund_bytes)),
-                "Paytm": (PAYTM_HEADERS, []),
-                "Formula": ([""] * 13, []),
+            tables: dict[str, tuple[list[str], list[list[object]]]] = {
+                "Auto Sales": (SALES_HEADERS, []),
+                "Advances": (VOUCHER_HEADERS, []),
+                "Receipt": (VOUCHER_HEADERS, []),
+                "Discount Allowed": (DISCOUNT_HEADERS, []),
+                "Doctor Fees": (DOCTOR_HEADERS, []),
+                "Auto Payment": (PAYMENT_HEADERS, []),
+                "Paytm": (VOUCHER_HEADERS + ["", ""], []),
+                "Formula": (FORMULA_HEADERS, []),
             }
-            output = make_workbook(tables)
-            Path(output_path).write_bytes(output)
-            summary = "\n".join(f"{name}: {len(rows)} rows" for name, (_, rows) in tables.items())
-            self.status.configure(text=f"Saved: {Path(output_path).name}")
+            row_counts: dict[str, int] = {}
+            if "charge" in self.paths:
+                name, payload = read("charge")
+                rows = sales_rows(name, payload)
+                tables["Auto Sales"] = (SALES_HEADERS, rows)
+                row_counts["Auto Sales"] = len(rows)
+            if "advance" in self.paths:
+                name, payload = read("advance")
+                rows = receipt_rows(name, payload)
+                tables["Advances"] = (VOUCHER_HEADERS, rows)
+                row_counts["Advances"] = len(rows)
+            if "receipt" in self.paths:
+                name, payload = read("receipt")
+                rows = receipt_rows(name, payload)
+                tables["Receipt"] = (VOUCHER_HEADERS, rows)
+                row_counts["Receipt"] = len(rows)
+            if "discount" in self.paths:
+                name, payload = read("discount")
+                rows = discount_rows(name, payload)
+                tables["Discount Allowed"] = (DISCOUNT_HEADERS, rows)
+                row_counts["Discount Allowed"] = len(rows)
+            if "doctor" in self.paths:
+                name, payload = read("doctor")
+                rows = doctor_fee_rows(name, payload)
+                tables["Doctor Fees"] = (DOCTOR_HEADERS, rows)
+                row_counts["Doctor Fees"] = len(rows)
+            if "refund" in self.paths:
+                name, payload = read("refund")
+                rows = refund_rows(name, payload)
+                tables["Auto Payment"] = (PAYMENT_HEADERS, rows)
+                row_counts["Auto Payment"] = len(rows)
+            if "bill" in self.paths:
+                name, payload = read("bill")
+                rows = formula_rows(name, payload)
+                tables["Formula"] = (FORMULA_HEADERS, rows)
+                row_counts["Formula"] = len(rows)
+
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(make_workbook(tables))
+            summary = "\n".join(f"{sheet}: {count} rows" for sheet, count in row_counts.items())
+            if not summary:
+                summary = "No source rows were found in the selected reports."
+            self.status.configure(text=f"Saved workbook: {destination}")
             messagebox.showinfo(
-                "Workbook created",
-                f"The output workbook was saved to:\n{output_path}\n\n{summary}",
+                "Output workbook created",
+                f"The formatted workbook was saved to:\n{destination}\n\n{summary}",
                 parent=self.root,
             )
         except Exception as exc:
