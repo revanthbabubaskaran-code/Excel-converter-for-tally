@@ -51,4 +51,4 @@ The PDF bank statement is ignored. The output always has the same eight sheets a
 
 Choose one `.xlsx` output file. It contains all eight sheets in the sample workbook's order and layout: `Auto Sales`, `Advances`, `Receipt`, `Discount Allowed`, `Doctor Fees`, `Auto Payment`, `Paytm`, and `Formula`. The `Formula` sheet contains the sample's single helper row, populated from the first IP Bill record. Upload `Card & UPI Payments` to populate the `Paytm` sheet; otherwise that sheet remains blank. Reports that were not selected leave their corresponding sheets blank. The PDF bank statement is ignored.
 
-The conversion rules are based on the July 2026 examples. Review the generated workbook before importing it into accounting software, especially if report columns or formats change.
+The conversion rules are based on the July 2026 examples. Auto Sales is sorted by Bill Date, Visit Number, and alphanumeric Bill Number in ascending order; dates are written as `DD/MM/YYYY`. Review the generated workbook before importing it into accounting software, especially if report columns or formats change.
