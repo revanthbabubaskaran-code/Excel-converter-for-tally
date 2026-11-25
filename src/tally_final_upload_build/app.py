@@ -12,12 +12,14 @@ from tally_final_upload_build.processor import (
     DOCTOR_HEADERS,
     FORMULA_HEADERS,
     PAYMENT_HEADERS,
+    PAYTM_HEADERS,
     SALES_HEADERS,
     VOUCHER_HEADERS,
     discount_rows,
     doctor_fee_rows,
     formula_rows,
     make_workbook,
+    paytm_rows,
     receipt_rows,
     refund_rows,
     sales_rows,
@@ -32,6 +34,7 @@ REPORTS = {
     "discount": ("IP Discount Report", "ip discount"),
     "receipt": ("IP Receipt Report", "ip receipt"),
     "refund": ("IP Refund Report", "ip refund"),
+    "paytm": ("Card & UPI Payments", "card upi payment"),
 }
 
 
@@ -153,7 +156,7 @@ class ExcelForTallyApp:
                 "Discount Allowed": (DISCOUNT_HEADERS, []),
                 "Doctor Fees": (DOCTOR_HEADERS, []),
                 "Auto Payment": (PAYMENT_HEADERS, []),
-                "Paytm": (VOUCHER_HEADERS + ["", ""], []),
+                "Paytm": (PAYTM_HEADERS, []),
                 "Formula": (FORMULA_HEADERS, []),
             }
             row_counts: dict[str, int] = {}
@@ -187,6 +190,11 @@ class ExcelForTallyApp:
                 rows = refund_rows(name, payload)
                 tables["Auto Payment"] = (PAYMENT_HEADERS, rows)
                 row_counts["Auto Payment"] = len(rows)
+            if "paytm" in self.paths:
+                name, payload = read("paytm")
+                rows = paytm_rows(name, payload)
+                tables["Paytm"] = (PAYTM_HEADERS, rows)
+                row_counts["Paytm"] = len(rows)
             if "bill" in self.paths:
                 name, payload = read("bill")
                 rows = formula_rows(name, payload)
