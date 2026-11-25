@@ -165,6 +165,11 @@ def _date_sort_key(value: Any) -> datetime:
     return _datetime(value) or datetime.min
 
 
+def _alphanumeric_sort_key(value: Any) -> tuple[tuple[int, Any], ...]:
+    parts = re.split(r"(\d+)", str(value or "").strip())
+    return tuple((1, int(part)) if part.isdigit() else (0, part.casefold()) for part in parts if part)
+
+
 def _amount(value: Any) -> Any:
     if value in (None, ""):
         return 0
@@ -205,22 +210,26 @@ def sales_rows(filename: str, payload: bytes) -> list[list[Any]]:
     _column(headers, "Item Value")
     _column(headers, "Discount")
 
-    indexed_rows: list[tuple[str, int, list[Any]]] = []
+    indexed_rows: list[tuple[datetime, tuple[tuple[int, Any], ...], tuple[tuple[int, Any], ...], int, list[Any]]] = []
     for index, row in enumerate(source):
         if not _has_values(row):
             continue
         bill = _get(row, headers, "Bill Number")
         bill_date = _get(row, headers, "Bill Date")
-        party = _party(_get(row, headers, "Visit Number"), _get(row, headers, "Patient Name"))
+        parsed_date = _datetime(bill_date)
+        if parsed_date is None:
+            raise ValueError(f"{filename}: row {index + 2} has a missing or invalid bill date.")
+        visit_number = _get(row, headers, "Visit Number")
+        party = _party(visit_number, _get(row, headers, "Patient Name"))
         amount = _amount(_get(row, headers, "Item Value"))
         result = [
             bill, _date_text(bill_date, four_digit_year=True), party, "Auto Sales", None, "Tamil Nadu",
             None, None, None, None, 0, amount, 0, 0, 0, 0, 0, amount,
             party, _amount(_get(row, headers, "Discount")), _get(row, headers, "Services / Charge Name"),
         ]
-        indexed_rows.append((str(bill or ""), index, result))
-    indexed_rows.sort(key=lambda item: (item[0], item[1]))
-    return [row for _, _, row in indexed_rows]
+        indexed_rows.append((parsed_date, _alphanumeric_sort_key(visit_number), _alphanumeric_sort_key(bill), index, result))
+    indexed_rows.sort(key=lambda item: item[:4])
+    return [row for _, _, _, _, row in indexed_rows]
 
 
 def receipt_rows(filename: str, payload: bytes) -> list[list[Any]]:
