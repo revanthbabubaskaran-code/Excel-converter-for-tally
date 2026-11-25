@@ -43,11 +43,12 @@ Select one or more of these Excel reports in the app:
 - IP Discount Report
 - IP Receipt Report
 - IP Refund Report
+- Card & UPI Payments
 
 The PDF bank statement is ignored. The output always has the same eight sheets as the supplied sample; sheets whose source report was not selected remain blank. The Paytm sheet remains blank because there is no Paytm receipt report among the inputs.
 
 ## Output notes
 
-Choose one `.xlsx` output file. It contains all eight sheets in the sample workbook's order and layout: `Auto Sales`, `Advances`, `Receipt`, `Discount Allowed`, `Doctor Fees`, `Auto Payment`, `Paytm`, and `Formula`. The `Formula` sheet contains the sample's single helper row, populated from the first IP Bill record. Reports that were not selected leave their corresponding sheets blank, and `Paytm` stays blank until a Paytm or OP Receipt report is supplied. No bank statement data is read.
+Choose one `.xlsx` output file. It contains all eight sheets in the sample workbook's order and layout: `Auto Sales`, `Advances`, `Receipt`, `Discount Allowed`, `Doctor Fees`, `Auto Payment`, `Paytm`, and `Formula`. The `Formula` sheet contains the sample's single helper row, populated from the first IP Bill record. Upload `Card & UPI Payments` to populate the `Paytm` sheet; otherwise that sheet remains blank. Reports that were not selected leave their corresponding sheets blank. The PDF bank statement is ignored.
 
 The conversion rules are based on the July 2026 examples. Review the generated workbook before importing it into accounting software, especially if report columns or formats change.
