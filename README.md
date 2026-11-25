@@ -48,6 +48,6 @@ The PDF bank statement is ignored. The output always has the same eight sheets a
 
 ## Output notes
 
-Choose one `.xlsx` output file. It contains all eight sheets in the sample workbook's order and layout: `Auto Sales`, `Advances`, `Receipt`, `Discount Allowed`, `Doctor Fees`, `Auto Payment`, `Paytm`, and `Formula`. The IP Bill Report populates the `Formula` sheet. Reports that were not selected leave their corresponding sheets blank, and `Paytm` stays blank. No bank statement data is read.
+Choose one `.xlsx` output file. It contains all eight sheets in the sample workbook's order and layout: `Auto Sales`, `Advances`, `Receipt`, `Discount Allowed`, `Doctor Fees`, `Auto Payment`, `Paytm`, and `Formula`. The `Formula` sheet contains the sample's single helper row, populated from the first IP Bill record. Reports that were not selected leave their corresponding sheets blank, and `Paytm` stays blank until a Paytm or OP Receipt report is supplied. No bank statement data is read.
 
 The conversion rules are based on the July 2026 examples. Review the generated workbook before importing it into accounting software, especially if report columns or formats change.

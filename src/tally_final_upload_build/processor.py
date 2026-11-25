@@ -58,310 +58,89 @@ def _rows_from_upload(filename: str, payload: bytes) -> tuple[list[str], list[li
             for row_index in range(sheet.nrows):
                 values: list[Any] = []
                 for col_index in range(sheet.ncols):
-                    cell = sheet.cell(row_index, col_index)
-                    value = cell.value
-                    if cell.ctype == xlrd.XL_CELL_DATE:
-                        value = xlrd.xldate.xldate_as_datetime(value, book.datemode)
-                    elif cell.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
-                        value = None
-                    values.append(value)
-                rows.append(values)
-        finally:
-            book.release_resources()
-    elif suffix == ".xlsx":
-        book = load_workbook(BytesIO(payload), read_only=True, data_only=True)
-        try:
-            sheet = book.active
-            rows = [list(row) for row in sheet.iter_rows(values_only=True)]
-        finally:
-            book.close()
-    else:
-        raise ValueError(f"{filename}: expected an .xls or .xlsx file")
+                    cell = sheet.cell(row_index, col_index)×®¸¶‰žËkºwµçNˆ
+][VÌK][VÌWJJBˆ™]\›ˆÜ›ÝÈ›ÜˆËË›ÝÈ[ˆ[™^YÜ›ÝÜ×B‚‚™Yˆ™XÙZ\Ü›ÝÜÊš[[˜[YNˆÝ‹^[ØYˆž]\ÊHOˆ\ÝÛ\ÝÐ[žWWN‚ˆXY\œËÛÝ\˜ÙHHÜ›ÝÜ×Ùœ›ÛWÝ\ØY
+š[[˜[YK^[ØY
+BˆØÛÛ[[ŠXY\œË”™XÙZ\[X™\ˆŠBˆØÛÛ[[ŠXY\œË”™XÙZ\]HŠBˆØÛÛ[[ŠXY\œË•š\Ú][X™\ˆŠBˆØÛÛ[[ŠXY\œË”]Y[˜[YHŠBˆØÛÛ[[ŠXY\œË“[ÙHŠBˆØÛÛ[[ŠXY\œË”™XÙZ\˜[YHŠB‚ˆ[™^YÜ›ÝÜÎˆ\ÝÝ\VÙ]][YK[\ÝÐ[žWWWHH×Bˆ›Üˆ[™^›ÝÈ[ˆ[[Y\˜]JÛÝ\˜ÙJN‚ˆYˆ›ÝÚ\×Ý˜[Y\Ê›ÝÊN‚ˆÛÛ[YBˆ\HHÜ\JÙÙ]
+›ÝËXY\œË•š\Ú][X™\ˆŠKÙÙ]
+›ÝËXY\œË”]Y[˜[YHŠJBˆ™XÙZ\Ù]HHÙÙ]
+›ÝËXY\œË”™XÙZ\]HŠBˆÝ]]HÂˆÙ]WÝ^
+™XÙZ\Ù]K›Ý\—ÙYÚ]ÞYX\Q˜[ÙJKˆÙÙ]
+›ÝËXY\œË”™XÙZ\[X™\ˆŠKˆØ˜[šÊÙÙ]
+›ÝËXY\œË“[ÙHŠJKˆ\KˆØ[[Ý[
+ÙÙ]
+›ÝËXY\œË”™XÙZ\˜[YHŠJKˆÙÙ]
+›ÝËXY\œË‘ÈÚ\]YH[™›ÈŠKˆ›Û™Kˆ\KˆBˆ[™^YÜ›ÝÜË˜\[™
 
-    header_index = next(
-        (index for index, row in enumerate(rows[:30]) if sum(bool(v is not None and str(v).strip()) for v in row) >= 3),
-        None,
-    )
-    if header_index is None:
-        raise ValueError(f"{filename}: could not find a header row")
-    headers = [str(value or "").strip() for value in rows[header_index]]
-    return headers, rows[header_index + 1 :]
+Ù]WÜÛÜÚÙ^J™XÙZ\Ù]JK[™^Ý]]
+JBˆ[™^YÜ›ÝÜËœÛÜ
+Ù^O[[X™H][Nˆ
+][VÌK][VÌWJJBˆ™]\›ˆÜ›ÝÈ›ÜˆËË›ÝÈ[ˆ[™^YÜ›ÝÜ×B‚‚™Yˆ™Y[™Ü›ÝÜÊš[[˜[YNˆÝ‹^[ØYˆž]\ÊHOˆ\ÝÛ\ÝÐ[žWWN‚ˆXY\œËÛÝ\˜ÙHHÜ›ÝÜ×Ùœ›ÛWÝ\ØY
+š[[˜[YK^[ØY
+Bˆ[™^YÜ›ÝÜÎˆ\ÝÝ\VÙ]][YK[\ÝÐ[žWWWHH×Bˆ›Üˆ[™^›ÝÈ[ˆ[[Y\˜]JÛÝ\˜ÙJN‚ˆYˆ›ÝÚ\×Ý˜[Y\Ê›ÝÊN‚ˆÛÛ[YBˆ^[Y[Ù]HHÙÙ]
+›ÝËXY\œË”^[Y[]HŠBˆ\HHÜ\JÙÙ]
+›ÝËXY\œË•š\Ú]›È‹•š\Ú][X™\ˆŠKÙÙ]
+›ÝËXY\œË”]Y[˜[YHŠJBˆÝ]]HÂˆÙ]WÝ^
+^[Y[Ù]K›Ý\—ÙYÚ]ÞYX\UYJKˆÙÙ]
+›ÝËXY\œË”^[Y[[X™\ˆŠKˆØ˜[šÊÙÙ]
+›ÝËXY\œË“[ÙHŠJKˆ\KˆØ[[Ý[
+ÙÙ]
+›ÝËXY\œË”^[Y[˜[YHŠJKˆÙÙ]
+›ÝËXY\œËÚ\]YH›ËˆŠKˆ›Û™Kˆ\KˆBˆ[™^YÜ›ÝÜË˜\[™
 
-
-def _column(headers: list[str], name: str, *aliases: str) -> int:
-    normalized = {_clean_header(header): index for index, header in enumerate(headers) if header}
-    for candidate in (name, *aliases):
-        key = _clean_header(candidate)
-        if key in normalized:
-            return normalized[key]
-    raise ValueError(f"Required column not found: {name}")
-
-
-def _get(row: list[Any], headers: list[str], name: str, *aliases: str, default: Any = None) -> Any:
-    try:
-        index = _column(headers, name, *aliases)
-    except ValueError:
-        return default
-    return row[index] if index < len(row) else default
-
-
-def _has_values(row: list[Any]) -> bool:
-    return any(value is not None and str(value).strip() for value in row)
-
-
-def _party(visit_number: Any, patient_name: Any) -> str:
-    visit = str(visit_number or "").strip()
-    patient = str(patient_name or "").strip()
-    return f"{visit}-{patient}" if visit and patient else visit or patient
-
-
-def _datetime(value: Any) -> datetime | None:
-    if isinstance(value, datetime):
-        return value
-    if isinstance(value, date):
-        return datetime.combine(value, datetime.min.time())
-    if isinstance(value, str):
-        text = value.strip()
-        for pattern in (
-            "%Y-%m-%d %H:%M:%S",
-            "%d/%m/%Y %H:%M:%S",
-            "%d/%m/%Y",
-            "%d/%m/%y",
-            "%Y-%m-%d",
-            "%m/%d/%Y",
-        ):
-            try:
-                return datetime.strptime(text, pattern)
-            except ValueError:
-                continue
-    return None
-
-
-def _date_text(value: Any, *, four_digit_year: bool) -> str:
-    parsed = _datetime(value)
-    if parsed is None:
-        return str(value or "").strip()
-    return parsed.strftime("%d/%m/%Y" if four_digit_year else "%d/%m/%y")
-
-
-def _date_sort_key(value: Any) -> datetime:
-    return _datetime(value) or datetime.min
-
-
-def _amount(value: Any) -> Any:
-    if value in (None, ""):
-        return 0
-    try:
-        number = float(value)
-        return int(number) if number.is_integer() else number
-    except (TypeError, ValueError):
-        return value
-
-
-def _bank(mode: Any) -> str:
-    text = str(mode or "").strip()
-    key = _clean_header(text)
-    if key in {"upi", "card", "ubi", "unionbankofindia"}:
-        return "UBI"
-    if key in {"eft", "indianoverseasbankca3762", "iob"}:
-        return "Indian Overseas Bank C.A 3762"
-    if key == "cash":
-        return "CASH"
-    return text
-
-
-def sales_rows(filename: str, payload: bytes) -> list[list[Any]]:
-    headers, source = _rows_from_upload(filename, payload)
-    _column(headers, "Bill Number")
-    _column(headers, "Bill Date")
-    _column(headers, "Visit Number")
-    _column(headers, "Patient Name")
-    _column(headers, "Services / Charge Name")
-    _column(headers, "Item Value")
-    _column(headers, "Discount")
-
-    indexed_rows: list[tuple[str, int, list[Any]]] = []
-    for index, row in enumerate(source):
-        if not _has_values(row):
-            continue
-        bill = _get(row, headers, "Bill Number")
-        bill_date = _get(row, headers, "Bill Date")
-        party = _party(_get(row, headers, "Visit Number"), _get(row, headers, "Patient Name"))
-        amount = _amount(_get(row, headers, "Item Value"))
-        result = [
-            bill, _date_text(bill_date, four_digit_year=True), party, "Auto Sales", None, "Tamil Nadu",
-            None, None, None, None, 0, amount, 0, 0, 0, 0, 0, amount,
-            party, _amount(_get(row, headers, "Discount")), _get(row, headers, "Services / Charge Name"),
-        ]
-        indexed_rows.append((str(bill or ""), index, result))
-    indexed_rows.sort(key=lambda item: (item[0], item[1]))
-    return [row for _, _, row in indexed_rows]
-
-
-def receipt_rows(filename: str, payload: bytes) -> list[list[Any]]:
-    headers, source = _rows_from_upload(filename, payload)
-    _column(headers, "Receipt Number")
-    _column(headers, "Receipt Date")
-    _column(headers, "Visit Number")
-    _column(headers, "Patient Name")
-    _column(headers, "Mode")
-    _column(headers, "Receipt Value")
-
-    indexed_rows: list[tuple[datetime, int, list[Any]]] = []
-    for index, row in enumerate(source):
-        if not _has_values(row):
-            continue
-        party = _party(_get(row, headers, "Visit Number"), _get(row, headers, "Patient Name"))
-        receipt_date = _get(row, headers, "Receipt Date")
-        output = [
-            _date_text(receipt_date, four_digit_year=False),
-            _get(row, headers, "Receipt Number"),
-            _bank(_get(row, headers, "Mode")),
-            party,
-            _amount(_get(row, headers, "Receipt Value")),
-            _get(row, headers, "DD / Cheque Info"),
-            None,
-            party,
-        ]
-        indexed_rows.append((_date_sort_key(receipt_date), index, output))
-    indexed_rows.sort(key=lambda item: (item[0], item[1]))
-    return [row for _, _, row in indexed_rows]
-
-
-def refund_rows(filename: str, payload: bytes) -> list[list[Any]]:
-    headers, source = _rows_from_upload(filename, payload)
-    indexed_rows: list[tuple[datetime, int, list[Any]]] = []
-    for index, row in enumerate(source):
-        if not _has_values(row):
-            continue
-        payment_date = _get(row, headers, "Payment Date")
-        party = _party(_get(row, headers, "Visit No", "Visit Number"), _get(row, headers, "Patient Name"))
-        output = [
-            _date_text(payment_date, four_digit_year=True),
-            _get(row, headers, "Payment Number"),
-            _bank(_get(row, headers, "Mode")),
-            party,
-            _amount(_get(row, headers, "Payment Value")),
-            _get(row, headers, "Cheque No."),
-            None,
-            party,
-        ]
-        indexed_rows.append((_date_sort_key(payment_date), index, output))
-    indexed_rows.sort(key=lambda item: (item[0], item[1]))
-    return [row for _, _, row in indexed_rows]
-
-
-def discount_rows(filename: str, payload: bytes) -> list[list[Any]]:
-    headers, source = _rows_from_upload(filename, payload)
-    value_column = _column(headers, "Net Discount Value", "Discount Value")
-    result: list[list[Any]] = []
-    for row in source:
-        if not _has_values(row):
-            continue
-        party = _party(_get(row, headers, "Visit Number"), _get(row, headers, "Patient Name"))
-        bill = _get(row, headers, "Bill No")
-        bill_date = _datetime(_get(row, headers, "Bill Time"))
-        value = _amount(row[value_column])
-        result.append(["Auto Journal", bill, bill_date, "Discount Allowed", value, None, party])
-        result.append(["Auto Journal", bill, bill_date, party, None, value, party])
-    return result
-
-
-def doctor_fee_rows(filename: str, payload: bytes, *, voucher_start: int = 943) -> list[list[Any]]:
-    headers, source = _rows_from_upload(filename, payload)
-    result: list[list[Any]] = []
-    sequence = voucher_start
-    for row in source:
-        if not _has_values(row):
-            continue
-        party = _party(_get(row, headers, "Visit Number"), _get(row, headers, "Patient Name"))
-        bill_date = _datetime(_get(row, headers, "Bill Date"))
-        value = _amount(_get(row, headers, "Net Value"))
-        doctor = _get(row, headers, "Doctor")
-        voucher_number = f"DOC/{sequence:04d}"
-        sequence += 1
-        result.append(["Auto Journal", voucher_number, bill_date, "Professional Charges", value, None, party])
-        result.append(["Auto Journal", voucher_number, bill_date, doctor, None, value, party])
-    return result
-
-
-def formula_rows(filename: str, payload: bytes) -> list[list[Any]]:
-    headers, source = _rows_from_upload(filename, payload)
-    result: list[list[Any]] = []
-    for row in source:
-        if not _has_values(row):
-            continue
-        row_number = len(result) + 2
-        category = _get(row, headers, "Bill Category")
-        if _clean_header(category) == "ipbill":
-            category = "IP"
-        result.append([
-            None,
-            _get(row, headers, "Bill No"),
-            category,
-            _datetime(_get(row, headers, "Bill Time")),
-            _get(row, headers, "MRN"),
-            _get(row, headers, "IP No #", "IP No"),
-            _get(row, headers, "Patient Name"),
-            f'=CONCATENATE(F{row_number},"-",G{row_number})',
-            None, None, None, None, None,
-        ])
-    return result
-
-
-def _copy_row_style(sheet: Any, source_row: int, target_row: int, max_column: int) -> None:
-    if target_row == source_row:
-        return
-    if sheet.row_dimensions[source_row].height is not None:
-        sheet.row_dimensions[target_row].height = sheet.row_dimensions[source_row].height
-    for column in range(1, max_column + 1):
-        source = sheet.cell(source_row, column)
-        target = sheet.cell(target_row, column)
-        if source.has_style:
-            target._style = copy(source._style)
-        if source.number_format:
-            target.number_format = source.number_format
-
-
-def make_workbook(tables: dict[str, tuple[list[str], Iterable[list[Any]]]]) -> bytes:
-    """Fill the sanitized sample layout and return one multi-sheet .xlsx file."""
-    if not LAYOUT_TEMPLATE.exists():
-        raise FileNotFoundError(f"Output layout template not found: {LAYOUT_TEMPLATE}")
-
-    book = load_workbook(LAYOUT_TEMPLATE)
-    try:
-        for sheet_name, headers in SHEET_HEADERS.items():
-            if sheet_name not in book.sheetnames:
-                raise ValueError(f"Output layout is missing the {sheet_name} sheet.")
-            sheet = book[sheet_name]
-            for cell in list(sheet._cells.values()):
-                if cell.row > 1:
-                    cell.value = None
-                    cell.comment = None
-                    cell.hyperlink = None
-
-            if sheet_name not in tables:
-                data_rows: list[list[Any]] = []
-            else:
-                _, iterable_rows = tables[sheet_name]
-                data_rows = [list(row) for row in iterable_rows]
-
-            max_column = max(sheet.max_column, len(headers))
-            for row_number, values in enumerate(data_rows, start=2):
-                if row_number > sheet.max_row or not any(
-                    sheet.cell(row_number, column).has_style for column in range(1, max_column + 1)
-                ):
-                    _copy_row_style(sheet, 2, row_number, max_column)
-                for column in range(1, max_column + 1):
-                    sheet.cell(row_number, column).value = values[column - 1] if column <= len(values) else None
-
-            if sheet.auto_filter.ref:
-                min_col, _, max_col, _ = range_boundaries(sheet.auto_filter.ref)
-                last_column = get_column_letter(max_col or len(headers))
-                sheet.auto_filter.ref = f"{get_column_letter(min_col or 1)}1:{last_column}{len(data_rows) + 1}"
-
-        output = BytesIO()
-        book.save(output)
-        return output.getvalue()
-    finally:
-        book.close()
+Ù]WÜÛÜÚÙ^J^[Y[Ù]JK[™^Ý]]
+JBˆ[™^YÜ›ÝÜËœÛÜ
+Ù^O[[X™H][Nˆ
+][VÌK][VÌWJJBˆ™]\›ˆÜ›ÝÈ›ÜˆËË›ÝÈ[ˆ[™^YÜ›ÝÜ×B‚‚™Yˆ\ØÛÝ[Ü›ÝÜÊš[[˜[YNˆÝ‹^[ØYˆž]\ÊHOˆ\ÝÛ\ÝÐ[žWWN‚ˆXY\œËÛÝ\˜ÙHHÜ›ÝÜ×Ùœ›ÛWÝ\ØY
+š[[˜[YK^[ØY
+Bˆ˜[YWØÛÛ[[ˆHØÛÛ[[ŠXY\œË“™]\ØÛÝ[˜[YH‹‘\ØÛÝ[˜[YHŠBˆ™\Ý[ˆ\ÝÛ\ÝÐ[žWWHH×Bˆ›Üˆ›ÝÈ[ˆÛÝ\˜ÙN‚ˆYˆ›ÝÚ\×Ý˜[Y\Ê›ÝÊN‚ˆÛÛ[YBˆ\HHÜ\JÙÙ]
+›ÝËXY\œË•š\Ú][X™\ˆŠKÙÙ]
+›ÝËXY\œË”]Y[˜[YHŠJBˆš[HÙÙ]
+›ÝËXY\œËš[›ÈŠBˆš[Ù]HHÙ]][YJÙÙ]
+›ÝËXY\œËš[[YHŠJBˆ˜[YHHØ[[Ý[
+›ÝÖÝ˜[YWØÛÛ[[—JBˆ™\Ý[˜\[™
+È]]È›Ý\›˜[‹š[š[Ù]K‘\ØÛÝ[[ÝÙY‹˜[YK›Û™K\WJBˆ™\Ý[˜\[™
+È]]È›Ý\›˜[‹š[š[Ù]K\K›Û™K˜[YK\WJBˆ™]\›ˆ™\Ý[‚‚™YˆØÝÜ—Ù™YWÜ›ÝÜÊš[[˜[YNˆÝ‹^[ØYˆž]\Ë
+‹›ÝXÚ\—ÜÝ\ˆ[HMÊHOˆ\ÝÛ\ÝÐ[žWWN‚ˆXY\œËÛÝ\˜ÙHHÜ›ÝÜ×Ùœ›ÛWÝ\ØY
+š[[˜[YK^[ØY
+Bˆ™\Ý[ˆ\ÝÛ\ÝÐ[žWWHH×BˆÙ\]Y[˜ÙHH›ÝXÚ\—ÜÝ\ˆ›Üˆ›ÝÈ[ˆÛÝ\˜ÙN‚ˆYˆ›ÝÚ\×Ý˜[Y\Ê›ÝÊN‚ˆÛÛ[YBˆ\HHÜ\JÙÙ]
+›ÝËXY\œË•š\Ú][X™\ˆŠKÙÙ]
+›ÝËXY\œË”]Y[˜[YHŠJBˆš[Ù]HHÙ]][YJÙÙ]
+›ÝËXY\œËš[]HŠJBˆ˜[YHHØ[[Ý[
+ÙÙ]
+›ÝËXY\œË“™]˜[YHŠJBˆØÝÜˆHÙÙ]
+›ÝËXY\œË‘ØÝÜˆŠBˆ›ÝXÚ\—Û[X™\ˆHˆ‘ÐËÞÜÙ\]Y[˜ÙNŒH‚ˆÙ\]Y[˜ÙH
+ÏHBˆ™\Ý[˜\[™
+È]]È›Ý\›˜[‹›ÝXÚ\—Û[X™\‹š[Ù]K”›Ù™\ÜÚ[Û˜[Ú\™Ù\È‹˜[YK›Û™K\WJBˆ™\Ý[˜\[™
+È]]È›Ý\›˜[‹›ÝXÚ\—Û[X™\‹š[Ù]KØÝÜ‹›Û™K˜[YK\WJBˆ™]\›ˆ™\Ý[‚‚™Yˆ›Ü›][WÜ›ÝÜÊš[[˜[YNˆÝ‹^[ØYˆž]\ÊHOˆ\ÝÛ\ÝÐ[žWWN‚ˆˆˆZ[HØ[\IÜÈÚ[™ÛH›Ü›][K]Xˆ^[\H›ÝÈœ›ÛHHTš[™\Üˆˆˆ‚ˆXY\œËÛÝ\˜ÙHHÜ›ÝÜ×Ùœ›ÛWÝ\ØY
+š[[˜[YK^[ØY
+Bˆ™\Ý[ˆ\ÝÛ\ÝÐ[žWWHH×Bˆ›Üˆ›ÝÈ[ˆÛÝ\˜ÙN‚ˆYˆ›ÝÚ\×Ý˜[Y\Ê›ÝÊN‚ˆÛÛ[YBˆ›Ý×Û[X™\ˆH[Š™\Ý[
+H
+È‚ˆØ]YÛÜžHHÙÙ]
+›ÝËXY\œËš[Ø]YÛÜžHŠBˆYˆØÛX[—ÚXY\ŠØ]YÛÜžJHOHš\š[Ž‚ˆØ]YÛÜžHH’T‚ˆ™\Ý[˜\[™
+Âˆ›Û™KˆÙÙ]
+›ÝËXY\œËš[›ÈŠKˆØ]YÛÜžKˆÙ]][YJÙÙ]
+›ÝËXY\œËš[[YHŠJKˆÙÙ]
+›ÝËXY\œË“T“ˆŠKˆÙÙ]
+›ÝËXY\œË’T›ÈÈ‹’T›ÈŠKˆÙÙ]
+›ÝËXY\œË”]Y[˜[YHŠKˆ‰ÏPÓÓÐUSUJžÜ›Ý×Û[X™\ŸK‹H‹ÞÜ›Ý×Û[X™\ŸJIËˆ›Û™K›Û™K›Û™K›Û™K›Û™KˆJBˆÈHØ[\H›Ü›][HXˆ\ÈHÛ™K\›ÝÈ[\‹Ù^[\HÚY]›Ý[‚ˆÈ^ÜÙˆ]™\žHTš[˜[œØXÝ[Û‹‚ˆœ™XZÂˆ™]\›ˆ™\Ý[‚‚™YˆØÛÜWÜ›Ý×ÜÝ[JÚY]ˆ[žKÛÝ\˜ÙWÜ›ÝÎˆ[\™Ù]Ü›ÝÎˆ[X^ØÛÛ[[Žˆ[
+HOˆ›Û™N‚ˆYˆ\™Ù]Ü›ÝÈOHÛÝ\˜ÙWÜ›ÝÎ‚ˆ™]\›‚ˆYˆÚY]œ›Ý×Ù[Y[œÚ[ÛœÖÜÛÝ\˜ÙWÜ›Ý×KšZYÚ\È›Ý›Û™N‚ˆÚY]œ›Ý×Ù[Y[œÚ[ÛœÖÝ\™Ù]Ü›Ý×KšZYÚHÚY]œ›Ý×Ù[Y[œÚ[ÛœÖÜÛÝ\˜ÙWÜ›Ý×KšZYÚˆ›ÜˆÛÛ[[ˆ[ˆ˜[™ÙJKX^ØÛÛ[[ˆ
+ÈJN‚ˆÛÝ\˜ÙHHÚY]˜Ù[
+ÛÝ\˜ÙWÜ›ÝËÛÛ[[ŠBˆ\™Ù]HÚY]˜Ù[
+\™Ù]Ü›ÝËÛÛ[[ŠBˆYˆÛÝ\˜ÙKš\×ÜÝ[N‚ˆ\™Ù]—ÜÝ[HHÛÜJÛÝ\˜ÙK—ÜÝ[JBˆYˆÛÝ\˜ÙK›[X™\—Ù›Ü›X]‚ˆ\™Ù]›[X™\—Ù›Ü›X]HÛÝ\˜ÙK›[X™\—Ù›Ü›X]‚‚™YˆXZÙWÝÛÜšØ›ÛÚÊX›\ÎˆXÝÜÝ‹\VÛ\ÝÜÝ—K]\˜X›VÛ\ÝÐ[žWWWWJHOˆž]\Î‚ˆˆˆ‘š[HØ[š]^™YØ[\H^[Ý][™™]\›ˆÛ™H][K\ÚY]žÞš[Kˆˆˆ‚ˆYˆ›ÝVSÕUÕSTUK™^\ÝÊ
+N‚ˆ˜Z\ÙHš[S›Ý›Ý[™\œ›ÜŠˆ“Ý]]^[Ý][\]H›Ý›Ý[™ˆÓVSÕUÕSTU_HŠB‚ˆ›ÛÚÈHØYÝÛÜšØ›ÛÚÊVSÕUÕSTUJBˆžN‚ˆ›ÜˆÚY]Û˜[YKXY\œÈ[ˆÒQUÒPQT”Ëš][\Ê
+N‚ˆYˆÚY]Û˜[YH›Ý[ˆ›ÛÚËœÚY]˜[Y\Î‚ˆ˜Z\ÙH˜[YQ\œ›ÜŠˆ“Ý]]^[Ý]\ÈZ\ÜÚ[™ÈHÜÚY]Û˜[Y_HÚY]ˆŠBˆÚY]H›ÛÚÖÜÚY]Û˜[YWBˆ›ÜˆÙ[[ˆ\Ý
+ÚY]—ØÙ[Ë˜[Y\Ê
+JN‚ˆYˆÙ[œ›ÝÈˆN‚ˆÙ[˜[YHH›Û™BˆÙ[˜ÛÛ[Y[H›Û™BˆÙ[š\\›[šÈH›Û™B‚ˆYˆÚY]Û˜[YH›Ý[ˆX›\Î‚ˆ]WÜ›ÝÜÎˆ\ÝÛ\ÝÐ[žWWHH×Bˆ[ÙN‚ˆË]\˜X›WÜ›ÝÜÈHX›\ÖÜÚY]Û˜[YWBˆ]WÜ›ÝÜÈHÛ\Ý
+›ÝÊH›Üˆ›ÝÈ[ˆ]\˜X›WÜ›ÝÜ×B‚ˆX^ØÛÛ[[ˆHX^
+ÚY]›X^ØÛÛ[[‹[ŠXY\œÊJBˆ›Üˆ›Ý×Û[X™\‹˜[Y\È[ˆ[[Y\˜]J]WÜ›ÝÜËÝ\LŠN‚ˆYˆ›Ý×Û[X™\ˆˆÚY]›X^Ü›ÝÈÜˆ›Ý[žJˆÚY]˜Ù[
+›Ý×Û[X™\‹ÛÛ[[ŠKš\×ÜÝ[H›ÜˆÛÛ[[ˆ[ˆ˜[™ÙJKX^ØÛÛ[[ˆ
+ÈJBˆ
+N‚ˆØÛÜWÜ›Ý×ÜÝ[JÚY]‹›Ý×Û[X™\‹X^ØÛÛ[[ŠBˆ›ÜˆÛÛ[[ˆ[ˆ˜[™ÙJKX^ØÛÛ[[ˆ
+ÈJN‚ˆÚY]˜Ù[
+›Ý×Û[X™\‹ÛÛ[[ŠK˜[YHH˜[Y\ÖØÛÛ[[ˆHWHYˆÛÛ[[ˆH[Š˜[Y\ÊH[ÙH›Û™B‚ˆYˆÚY]˜]]×Ùš[\‹œ™YŽ‚ˆZ[—ØÛÛËX^ØÛÛÈH˜[™ÙWØ›Ý[™\šY\ÊÚY]˜]]×Ùš[\‹œ™YŠBˆ\ÝØÛÛ[[ˆHÙ]ØÛÛ[[—Û]\ŠX^ØÛÛÜˆ[ŠXY\œÊJBˆÚY]˜]]×Ùš[\‹œ™YˆHˆžÙÙ]ØÛÛ[[—Û]\ŠZ[—ØÛÛÜˆJ_LNžÛ\ÝØÛÛ[[Ÿ^Û[Š]WÜ›ÝÜÊH
+È_H‚‚ˆÝ]]Hž]\ÒSÊ
+Bˆ›ÛÚËœØ]™JÝ]]
+Bˆ™]\›ˆÝ]]™Ù]˜[YJ
+Bˆš[˜[N‚ˆ›ÛÚË˜ÛÜÙJ
+B
