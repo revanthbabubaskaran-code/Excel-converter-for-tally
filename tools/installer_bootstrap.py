@@ -257,7 +257,7 @@ class SetupWindow:
     @staticmethod
     def payload_path() -> Path:
         bundle_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
-        return bundle_root / "payload" / APP_EXE_NAME
+        return bundle_root / "payload"
 
     def install(self) -> None:
         if self._install_check_running:
@@ -318,7 +318,7 @@ class SetupWindow:
                 return
 
             payload = self.payload_path()
-            if not payload.is_file():
+            if not payload.is_dir() or not (payload / APP_EXE_NAME).is_file():
                 raise OSError("The application files are missing from this setup package.")
             if self.install_directory.exists() and not self.install_directory.is_dir():
                 raise OSError("The selected installation path is not a folder.")
@@ -334,7 +334,7 @@ class SetupWindow:
             )
             self.install_directory.mkdir(parents=True, exist_ok=True)
             destination = self.install_directory / APP_EXE_NAME
-            shutil.copy2(payload, destination)
+            shutil.copytree(payload, self.install_directory, dirs_exist_ok=True)
             if token:
                 activate_license(token)
 

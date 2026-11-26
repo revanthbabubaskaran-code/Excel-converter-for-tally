@@ -4,7 +4,7 @@ A local Windows desktop app that converts the supplied hospital `.xls` reports i
 
 ## Device licensing
 
-Each Windows installation needs an owner-approved device license. Setup sends a request code to the online service and checks for approval automatically while setup remains open. The owner reviews requests in a protected dashboard and clicks **Approve**; the service then creates a signed license for that device. Licenses are bound to the Windows MachineGuid, so another device needs its own approval. Setup also requires a network connection to the license service before installation.
+Each Windows installation needs an owner-approved device license. Setup sends a request to the online service and checks its status automatically while setup remains open. The owner reviews requests in a protected dashboard and clicks **Approve**; the service then creates a signed license for that device. Licenses are bound to the Windows MachineGuid, so another device needs its own approval. Setup also requires a network connection to the license service before installation.
 
 ### Free Cloudflare deployment
 
@@ -23,7 +23,16 @@ The first run lets you create a local profile with an email ID and a 4–8 chara
 
 ## Run on Windows
 
-Download and run [Excel for Tally Setup.exe](release/Excel%20for%20Tally%20Setup.exe). The setup package includes the standalone application and runtime dependencies; it does not require a separate Python installation. A network connection is required to verify or request the device license.
+Download and run [Excel for Tally Setup.exe](release/Excel%20for%20Tally%20Setup.exe). Setup installs `Excel for Tally.exe` together with its bundled `_internal` runtime folder and dependencies; it does not require a separate Python installation. License requests and checks run automatically in the background. A network connection is required during installation.
+
+To rebuild the Windows packages with Python 3.14 and PyInstaller installed, run these commands from the repository root:
+
+```powershell
+pyinstaller --noconfirm --distpath dist/app --workpath build/app "packaging/Excel for Tally.spec"
+pyinstaller --noconfirm --distpath dist/setup --workpath build/setup "packaging/Excel for Tally Setup.spec"
+```
+
+The setup spec bundles the complete `dist/app/Excel for Tally` directory into the installer. The installed application directory contains the executable and all files from that bundle.
 
 For development from source, install Python 3.14 or newer and [uv](https://docs.astral.sh/uv/), then run `uv sync` and `uv run tally-final-upload-build`.
 
