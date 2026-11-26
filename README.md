@@ -4,7 +4,7 @@ A local Windows desktop app that converts the supplied hospital `.xls` reports i
 
 ## Device licensing
 
-Each Windows installation needs an owner-approved device license. The app submits its request code to the online service. The owner reviews the request in a protected dashboard and clicks **Approve**; the service then creates a unique signed license for that device. The user clicks **Check status** in the app to activate it. Licenses are bound to the Windows MachineGuid, so copying a license to another device will not activate it and requires a new request. The same device can check again to recover its approved license. Reinstalling Windows can require a new license. Users with the source code can alter the app's checks.
+Each Windows installation needs an owner-approved device license. Setup sends a request code to the online service and checks for approval automatically while setup remains open. The owner reviews requests in a protected dashboard and clicks **Approve**; the service then creates a signed license for that device. Licenses are bound to the Windows MachineGuid, so another device needs its own approval. Setup also requires a network connection to the license service before installation.
 
 ### Free Cloudflare deployment
 
@@ -23,7 +23,9 @@ The first run lets you create a local profile with an email ID and a 4–8 chara
 
 ## Run on Windows
 
-Install Python 3.14 or newer and [uv](https://docs.astral.sh/uv/). Then double-click `Excel for tally.bat`. The launcher installs the project dependencies and opens the app window.
+Download and run [Excel for Tally Setup.exe](release/Excel%20for%20Tally%20Setup.exe). The setup package includes the standalone application and runtime dependencies; it does not require a separate Python installation. A network connection is required to verify or request the device license.
+
+For development from source, install Python 3.14 or newer and [uv](https://docs.astral.sh/uv/), then run `uv sync` and `uv run tally-final-upload-build`.
 
 You can also open PowerShell in this folder and run:
 

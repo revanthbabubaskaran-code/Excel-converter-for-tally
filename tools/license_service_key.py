@@ -7,10 +7,14 @@ from pathlib import Path
 import secrets
 import sys
 
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE = ROOT / "src"
+if str(SOURCE) not in sys.path:
+    sys.path.insert(0, str(SOURCE))
+
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-ROOT = Path(__file__).resolve().parents[1]
 PRIVATE_KEY_FILE = ROOT / ".license_signing_key.dpapi"
 ADMIN_TOKEN_FILE = ROOT / ".license_admin_token.dpapi"
 PUBLIC_KEY_FILE = ROOT / "src" / "tally_final_upload_build" / "license_public_key.txt"

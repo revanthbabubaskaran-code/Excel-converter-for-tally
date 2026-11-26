@@ -8,7 +8,6 @@ import json
 import os
 from pathlib import Path
 import re
-import json
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
@@ -149,16 +148,40 @@ def save_license_service_url(value: str) -> str:
 
 def _service_json(url: str, method: str, payload: dict | None = None) -> dict:
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
-    request = Request(url, data=data, method=method, headers={"Content-Type": "application/json"})
+    request = Request(
+        url,
+        data=data,
+        method=method,
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "ExcelForTallySetup/1.0",
+        },
+    )
     try:
         with urlopen(request, timeout=20) as response:
-            result = json.loads(response.read().decode("utf-8"))
+            response_body = response.read().decode("utf-8", errors="replace")
+            try:
+                result = json.loads(response_body)
+            except json.JSONDecodeError as exc:
+                raise LicenseError(
+                    f"The license service returned HTTP {response.status} with an invalid response."
+                ) from exc
     except HTTPError as exc:
+        response_body = exc.read().decode("utf-8", errors="replace").strip()
+        detail = ""
         try:
-            detail = json.loads(exc.read().decode("utf-8")).get("error", "The license service rejected the request.")
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            detail = "The license service rejected the request."
-        raise LicenseError(str(detail)) from exc
+            error_body = json.loads(response_body)
+            if isinstance(error_body, dict):
+                detail = str(error_body.get("error", "")).strip()
+        except json.JSONDecodeError:
+            pass
+        if not detail and response_body and "<html" not in response_body[:500].casefold():
+            detail = response_body[:300]
+        description = f"HTTP {exc.code} ({exc.reason})"
+        if detail:
+            description += f": {detail}"
+        raise LicenseError(f"The license service rejected the request — {description}.") from exc
     except (URLError, TimeoutError, OSError) as exc:
         raise LicenseError("Could not reach the online license service. Check the service address and internet connection.") from exc
     except json.JSONDecodeError as exc:
@@ -166,6 +189,16 @@ def _service_json(url: str, method: str, payload: dict | None = None) -> dict:
     if not isinstance(result, dict):
         raise LicenseError("The online license service returned an invalid response.")
     return result
+
+
+def check_license_service(service_url: str | None = None) -> None:
+    """Require a successful HTTPS health check before installation proceeds."""
+    base = save_license_service_url(service_url) if service_url else license_service_url()
+    if not base:
+        raise LicenseError("The online license service address is not configured.")
+    result = _service_json(f"{base}/health", "GET")
+    if result.get("status") != "ok":
+        raise LicenseError("The online license service is unavailable.")
 
 
 def submit_online_license_request(code: str, service_url: str) -> dict:
