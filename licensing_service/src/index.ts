@@ -77,7 +77,18 @@ function base64Bytes(value: string): Uint8Array {
 async function signLicense(deviceId: string, env: Env): Promise<string> {
   if (!env.LICENSE_SIGNING_KEY) throw new Error("License signing is not configured.");
   const privateBytes = base64Bytes(env.LICENSE_SIGNING_KEY.trim());
-  const privateKey = await crypto.subtle.importKey("raw", privateBytes, { name: "Ed25519" }, false, ["sign"]);
+  if (privateBytes.byteLength !== 32) {
+    throw new Error("LICENSE_SIGNING_KEY must be the base64-encoded 32-byte Ed25519 seed.");
+  }
+  // Cloudflare Workers require Ed25519 private keys in PKCS#8, not raw seed form.
+  const pkcs8Prefix = Uint8Array.from([
+    0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06,
+    0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20,
+  ]);
+  const pkcs8Key = new Uint8Array(pkcs8Prefix.byteLength + privateBytes.byteLength);
+  pkcs8Key.set(pkcs8Prefix);
+  pkcs8Key.set(privateBytes, pkcs8Prefix.byteLength);
+  const privateKey = await crypto.subtle.importKey("pkcs8", pkcs8Key, { name: "Ed25519" }, false, ["sign"]);
   const payload = JSON.stringify({
     device_id: deviceId,
     issued_utc: new Date().toISOString(),
