@@ -32,8 +32,8 @@ class SetupWindow:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title(f"{APP_NAME} Setup")
-        self.root.geometry("660x700")
-        self.root.minsize(600, 650)
+        self.root.geometry("660x580")
+        self.root.minsize(600, 540)
         self.root.configure(bg="#f3f6f8")
         self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
         self.install_directory = INSTALL_DIRECTORY
@@ -57,7 +57,7 @@ class SetupWindow:
         ttk.Label(outer, text=f"Install {APP_NAME}", style="Title.TLabel").pack(anchor="w")
         ttk.Label(
             outer,
-            text="Setup requests approval for this Windows device automatically. You can copy its device token and send it to the software owner.",
+            text="Setup checks this device's license automatically. Keep this window open while the check completes.",
             style="Sub.TLabel",
             wraplength=520,
             justify="left",
@@ -66,27 +66,17 @@ class SetupWindow:
         self.error_label = ttk.Label(outer, text="", style="Error.TLabel", wraplength=520)
         self.error_label.pack(anchor="w", pady=(0, 5))
         try:
-            self.device_request_code = request_code()
+            self.already_licensed = is_licensed()
+            self.device_request_code = "" if self.already_licensed else request_code()
         except LicenseError as exc:
+            self.already_licensed = False
             self.device_request_code = ""
             self.error_label.configure(text=str(exc))
-
-        ttk.Label(outer, text="Device request token (send this to the software owner)").pack(anchor="w")
-        token_row = ttk.Frame(outer)
-        token_row.pack(fill="x", pady=(4, 12))
-        self.request_token = tk.StringVar(value=self.device_request_code)
-        self.request_entry = ttk.Entry(token_row, textvariable=self.request_token, state="readonly", font=("Consolas", 10))
-        self.request_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        self.copy_token_button = ttk.Button(token_row, text="Copy token", command=self.copy_request_token)
-        self.copy_token_button.pack(side="right")
-
-        ttk.Label(outer, text="Owner-issued device license").pack(anchor="w")
-        self.license_entry = ttk.Entry(outer, font=("Consolas", 9))
-        self.license_entry.pack(fill="x", pady=(4, 7))
+        self.received_license = ""
 
         self.status = ttk.Label(
             outer,
-            text="Enter the owner-issued license for this device. Setup checks it before installing.",
+            text="Checking this device's license…" if not self.already_licensed else "A valid license is saved for this device.",
             style="Sub.TLabel",
             wraplength=520,
         )
@@ -103,32 +93,19 @@ class SetupWindow:
 
         self.install_button = ttk.Button(
             outer,
-            text="Check license and install",
+            text="Install",
             style="Accent.TButton",
             command=self.install,
         )
         self.install_button.pack(anchor="e", pady=(2, 14))
 
         try:
-            if is_licensed():
-                self.status.configure(
-                    text="A valid license is already saved for this device. Click Install to continue; no license entry is needed."
-                )
-                self.license_entry.configure(state="disabled")
-                self.install_button.configure(text="Install using saved license")
+            if self.already_licensed:
+                self.status.configure(text="A valid license is saved for this device. Click Install to continue.")
             elif self.device_request_code:
                 self.service_call()
         except LicenseError as exc:
             self.error_label.configure(text=str(exc))
-
-    def copy_request_token(self) -> None:
-        if not self.device_request_code:
-            self.status.configure(text="The device token is unavailable on this computer.", style="Error.TLabel")
-            return
-        self.root.clipboard_clear()
-        self.root.clipboard_append(self.device_request_code)
-        self.root.update()
-        self.status.configure(text="Device token copied. Send it to the software owner.", style="Sub.TLabel")
 
     def choose_install_directory(self) -> None:
         initial_directory = self.install_directory
@@ -189,12 +166,12 @@ class SetupWindow:
             self._receive_license(str(result["license_token"]))
         elif state == "pending":
             self.status.configure(
-                text="License request sent. Waiting for owner approval; setup will check automatically.",
+                text="License request sent. Awaiting response.",
                 style="Sub.TLabel",
             )
             self._schedule_service_check(5_000)
         elif state == "rejected":
-            self.status.configure(text="The owner declined this license request.", style="Error.TLabel")
+            self.status.configure(text="A license could not be issued for this device.", style="Error.TLabel")
         else:
             self.status.configure(
                 text=f"The license service returned an unexpected status. Retrying automatically in {self._retry_delay_ms // 1_000} seconds. Keep setup open.",
@@ -221,7 +198,7 @@ class SetupWindow:
         code = self.device_request_code
         if not code:
             return
-        self.status.configure(text="Checking for owner approval…", style="Sub.TLabel")
+        self.status.configure(text="Checking license status…", style="Sub.TLabel")
 
         def worker() -> None:
             result: dict | None = None
@@ -253,12 +230,12 @@ class SetupWindow:
             self._receive_license(str(result["license_token"]))
         elif state == "pending":
             self.status.configure(
-                text="License request sent. Waiting for owner approval; setup will check automatically.",
+                text="License request sent. Awaiting response.",
                 style="Sub.TLabel",
             )
             self._schedule_service_check(5_000)
         elif state == "rejected":
-            self.status.configure(text="The owner declined this license request.", style="Error.TLabel")
+            self.status.configure(text="A license could not be issued for this device.", style="Error.TLabel")
         else:
             delay = self._next_retry_delay()
             self.status.configure(
@@ -274,13 +251,8 @@ class SetupWindow:
             except tk.TclError:
                 pass
             self._service_after_id = None
-        self.license_entry.configure(state="normal")
-        self.license_entry.delete(0, tk.END)
-        self.license_entry.insert(0, token)
-        self.status.configure(
-            text="Owner approved this device. License received; click Check license and install to continue.",
-            style="Sub.TLabel",
-        )
+        self.received_license = token
+        self.status.configure(text="License obtained successfully. You can install now.", style="Sub.TLabel")
 
     @staticmethod
     def payload_path() -> Path:
@@ -326,10 +298,10 @@ class SetupWindow:
     def _install_after_network_check(self) -> None:
         try:
             already_licensed = is_licensed()
-            token = None if already_licensed else self.license_entry.get().strip()
+            token = None if already_licensed else self.received_license.strip()
             if not already_licensed and not token:
                 self.status.configure(
-                    text="License request sent. Waiting for owner approval; setup will check automatically. Keep setup open.",
+                    text="License request sent. Awaiting response. Keep setup open.",
                     style="Sub.TLabel",
                 )
                 return
@@ -340,7 +312,7 @@ class SetupWindow:
                 )
                 messagebox.showerror(
                     "License verification failed",
-                    "This owner-issued license is invalid or was issued for another device. The software was not installed.",
+                    "This license is invalid or belongs to another device. The software was not installed.",
                     parent=self.root,
                 )
                 return
@@ -369,7 +341,7 @@ class SetupWindow:
             completion = (
                 "Installation completed using the license already saved on this device."
                 if already_licensed
-                else "Installation completed. Your device license is saved."
+                else "Installation completed. This device's license is saved."
             )
             self.status.configure(text=completion, style="Sub.TLabel")
             messagebox.showinfo(
