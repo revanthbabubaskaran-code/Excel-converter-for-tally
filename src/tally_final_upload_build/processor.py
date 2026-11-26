@@ -159,8 +159,9 @@ def _date_text(value: Any, *, four_digit_year: bool) -> str:
     return parsed.strftime("%d/%m/%Y" if four_digit_year else "%d/%m/%y")
 
 
-def _date_sort_key(value: Any) -> datetime:
-    return _datetime(value) or datetime.min
+def _calendar_date_sort_key(value: Any) -> datetime:
+    parsed = _datetime(value)
+    return parsed.replace(hour=0, minute=0, second=0, microsecond=0) if parsed else datetime.min
 
 
 def _alphanumeric_sort_key(value: Any) -> tuple[tuple[int, Any], ...]:
@@ -224,7 +225,7 @@ def sales_rows(filename: str, payload: bytes) -> list[list[Any]]:
             None, None, None, None, 0, amount, 0, 0, 0, 0, 0, amount,
             party, _amount(_get(row, headers, "Discount")), _get(row, headers, "Services / Charge Name"),
         ]
-        indexed_rows.append((parsed_date, _alphanumeric_sort_key(bill), index, result))
+        indexed_rows.append((_calendar_date_sort_key(bill_date), _alphanumeric_sort_key(bill), index, result))
     indexed_rows.sort(key=lambda item: item[:3])
     return [row for _, _, _, row in indexed_rows]
 
@@ -238,7 +239,7 @@ def receipt_rows(filename: str, payload: bytes) -> list[list[Any]]:
     _column(headers, "Mode")
     _column(headers, "Receipt Value")
 
-    indexed_rows: list[tuple[datetime, int, list[Any]]] = []
+    indexed_rows: list[tuple[datetime, tuple[tuple[int, Any], ...], int, list[Any]]] = []
     for index, row in enumerate(source):
         if not _has_values(row):
             continue
@@ -254,14 +255,19 @@ def receipt_rows(filename: str, payload: bytes) -> list[list[Any]]:
             None,
             party,
         ]
-        indexed_rows.append((_date_sort_key(receipt_date), index, output))
-    indexed_rows.sort(key=lambda item: (item[0], item[1]))
-    return [row for _, _, row in indexed_rows]
+        indexed_rows.append((
+            _calendar_date_sort_key(receipt_date),
+            _alphanumeric_sort_key(_get(row, headers, "Receipt Number")),
+            index,
+            output,
+        ))
+    indexed_rows.sort(key=lambda item: (item[0], item[1], item[2]))
+    return [row for _, _, _, row in indexed_rows]
 
 
 def refund_rows(filename: str, payload: bytes) -> list[list[Any]]:
     headers, source = _rows_from_upload(filename, payload)
-    indexed_rows: list[tuple[datetime, int, list[Any]]] = []
+    indexed_rows: list[tuple[datetime, tuple[tuple[int, Any], ...], int, list[Any]]] = []
     for index, row in enumerate(source):
         if not _has_values(row):
             continue
@@ -277,15 +283,21 @@ def refund_rows(filename: str, payload: bytes) -> list[list[Any]]:
             None,
             party,
         ]
-        indexed_rows.append((_date_sort_key(payment_date), index, output))
-    indexed_rows.sort(key=lambda item: (item[0], item[1]))
-    return [row for _, _, row in indexed_rows]
+        indexed_rows.append((
+            _calendar_date_sort_key(payment_date),
+            _alphanumeric_sort_key(_get(row, headers, "Payment Number")),
+            index,
+            output,
+        ))
+    indexed_rows.sort(key=lambda item: (item[0], item[1], item[2]))
+    return [row for _, _, _, row in indexed_rows]
 
 
 def paytm_rows(filename: str, payload: bytes, *, first_rec_no: str) -> list[list[Any]]:
     """Map the Card & UPI statement into the sample Paytm sheet."""
     headers, source = _rows_from_upload(filename, payload)
     date_column = _column(headers, "BANK CREDIT DATE")
+    sequence_column = _column(headers, "SL.NO", "SL NO")
     account_column = _column(headers, "DEPART")
     card_upi_column = _column(headers, "CARD/UPI", "CARD / UPI")
     amount_column = _column(headers, "TOTAL")
@@ -300,7 +312,7 @@ def paytm_rows(filename: str, payload: bytes, *, first_rec_no: str) -> list[list
     sequence = int(rec_digits)
     number_width = len(rec_digits)
 
-    result: list[list[Any]] = []
+    candidates: list[tuple[datetime, tuple[tuple[int, Any], ...], int, list[Any]]] = []
     for index, row in enumerate(source, start=2):
         if not _has_values(row):
             continue
@@ -322,16 +334,22 @@ def paytm_rows(filename: str, payload: bytes, *, first_rec_no: str) -> list[list
         visit_text = "" if visit is None else str(visit).strip()
         name_text = "" if name is None else str(name).strip()
         narration = f"{visit_text}-{name_text}"
-        result.append([
+        source_sequence = row[sequence_column] if sequence_column < len(row) else None
+        candidates.append((payment_date, _alphanumeric_sort_key(source_sequence), index, [
             payment_date,
-            f"{rec_prefix}{sequence:0{number_width}d}",
+            None,
             "UBI",
             account,
             _amount(row[amount_column] if amount_column < len(row) else None),
             None,
             None,
             narration,
-        ])
+        ]))
+    candidates.sort(key=lambda item: (_calendar_date_sort_key(item[0]), item[1], item[2]))
+    result: list[list[Any]] = []
+    for _, _, _, output in candidates:
+        output[1] = f"{rec_prefix}{sequence:0{number_width}d}"
+        result.append(output)
         sequence += 1
     return result
 
@@ -339,8 +357,8 @@ def paytm_rows(filename: str, payload: bytes, *, first_rec_no: str) -> list[list
 def discount_rows(filename: str, payload: bytes) -> list[list[Any]]:
     headers, source = _rows_from_upload(filename, payload)
     value_column = _column(headers, "Net Discount Value", "Discount Value")
-    result: list[list[Any]] = []
-    for row in source:
+    indexed_rows: list[tuple[datetime, tuple[tuple[int, Any], ...], int, list[Any]]] = []
+    for index, row in enumerate(source):
         if not _has_values(row):
             continue
         party = _party(_get(row, headers, "Visit Number"), _get(row, headers, "Patient Name"))
@@ -349,8 +367,16 @@ def discount_rows(filename: str, payload: bytes) -> list[list[Any]]:
         if bill_date is not None:
             bill_date = bill_date.replace(hour=0, minute=0, second=0, microsecond=0)
         value = _amount(row[value_column])
-        result.append(["Auto Journal", bill, bill_date, "Discount Allowed", value, None, party])
-        result.append(["Auto Journal", bill, bill_date, party, None, value, party])
+        indexed_rows.append((
+            _calendar_date_sort_key(bill_date), _alphanumeric_sort_key(bill), index,
+            ["Auto Journal", bill, bill_date, "Discount Allowed", value, None, party],
+        ))
+    indexed_rows.sort(key=lambda item: (item[0], item[1], item[2]))
+    result: list[list[Any]] = []
+    for _, _, _, debit_row in indexed_rows:
+        credit_row = ["Auto Journal", debit_row[1], debit_row[2], debit_row[6], None, debit_row[4], debit_row[6]]
+        debit_row[5] = None
+        result.extend((debit_row, credit_row))
     return result
 
 
@@ -371,7 +397,7 @@ def doctor_fee_rows(
     result: list[list[Any]] = []
     dated_source = [
         (
-            _date_sort_key(_get(row, headers, "Bill Date")),
+            _calendar_date_sort_key(_get(row, headers, "Bill Date")),
             _alphanumeric_sort_key(_get(row, headers, "Bill Number")),
             index,
             row,
