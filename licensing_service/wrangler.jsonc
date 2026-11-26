@@ -8,7 +8,7 @@
     {
       "binding": "LICENSE_DB",
       "database_name": "excel-for-tally-licenses",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "2ae7a526-0d90-4570-b17d-a1336f9daa0c",
       "migrations_dir": "migrations"
     }
   ]

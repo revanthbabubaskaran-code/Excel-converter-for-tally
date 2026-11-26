@@ -2,22 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import threading
-import time
 import tkinter as tk
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import messagebox, ttk
 
 from tally_final_upload_build.app import ExcelForTallyApp
-from tally_final_upload_build.email_verification import new_verification_code, send_verification_code
-from tally_final_upload_build.gmail_oauth import (
-    GmailOAuthError,
-    authorize_gmail,
-    gmail_client_id,
-    is_gmail_connected,
-    save_gmail_client_id,
-)
 from tally_final_upload_build.licensing import (
     LicenseError,
     activate_license,
@@ -71,10 +60,6 @@ class LoginFlow:
         return len(proposed) <= PASSWORD_MAX_LENGTH
 
     @staticmethod
-    def _verification_code_ok(proposed: str) -> bool:
-        return len(proposed) <= 4 and (not proposed or proposed.isascii() and proposed.isdigit())
-
-    @staticmethod
     def _profile_location() -> str:
         from tally_final_upload_build.profile import profile_path
 
@@ -118,12 +103,12 @@ class LoginFlow:
 
     def show_setup(self) -> None:
         outer = self._content()
-        self.root.geometry("560x760")
-        self.root.minsize(520, 700)
+        self.root.geometry("560x560")
+        self.root.minsize(520, 500)
         ttk.Label(outer, text="Create your local profile", font=("Segoe UI", 13, "bold")).pack(anchor="w", pady=(20, 3))
         ttk.Label(
             outer,
-            text="Verify your email before creating a profile. Your profile and password hash are saved on this Windows account.",
+            text="Create a profile with your email ID and a password. Your profile and password hash are saved on this Windows account.",
             style="Sub.TLabel",
             wraplength=440,
             justify="left",
@@ -132,139 +117,6 @@ class LoginFlow:
         ttk.Label(outer, text="Login email ID").pack(anchor="w")
         email_entry = ttk.Entry(outer, font=("Segoe UI", 11))
         email_entry.pack(fill="x", pady=(4, 12))
-
-        gmail_row = ttk.Frame(outer)
-        gmail_row.pack(fill="x", pady=(0, 12))
-        gmail_status = ttk.Label(gmail_row, text="", style="Sub.TLabel")
-        gmail_status.pack(side="left", fill="x", expand=True)
-
-        def set_gmail_status(message: str, error_state: bool = False) -> None:
-            gmail_status.configure(text=message, style="Error.TLabel" if error_state else "Sub.TLabel")
-
-        def connect_gmail() -> None:
-            try:
-                client_id = gmail_client_id()
-            except GmailOAuthError as exc:
-                set_gmail_status(str(exc), error_state=True)
-                return
-            if not client_id:
-                client_id = simpledialog.askstring(
-                    "Google OAuth setup",
-                    "Enter the Google OAuth client ID for a Desktop app. This is a public app ID, not a password.",
-                    parent=self.root,
-                )
-                if not client_id:
-                    return
-                try:
-                    save_gmail_client_id(client_id)
-                    client_id = gmail_client_id()
-                except GmailOAuthError as exc:
-                    set_gmail_status(str(exc), error_state=True)
-                    return
-            if not client_id:
-                set_gmail_status("Google OAuth client ID is not configured.", error_state=True)
-                return
-
-            connect_button.configure(state="disabled")
-            set_gmail_status("Complete Google sign-in in your default browser…")
-
-            def authorize() -> None:
-                failure = ""
-                try:
-                    authorize_gmail(client_id)
-                except GmailOAuthError as exc:
-                    failure = str(exc)
-
-                def finish() -> None:
-                    connect_button.configure(state="normal")
-                    if failure:
-                        set_gmail_status(failure, error_state=True)
-                    else:
-                        set_gmail_status("Gmail account connected.")
-
-                self.root.after(0, finish)
-
-            threading.Thread(target=authorize, daemon=True).start()
-
-        connect_button = ttk.Button(gmail_row, text="Connect Gmail account", command=connect_gmail)
-        connect_button.pack(side="right")
-        try:
-            set_gmail_status("Gmail account connected." if is_gmail_connected() else "Connect Gmail to receive verification codes.")
-        except GmailOAuthError as exc:
-            set_gmail_status(str(exc), error_state=True)
-
-        code_frame = ttk.Frame(outer)
-        ttk.Label(code_frame, text="4-digit email verification code").pack(anchor="w")
-        code_vcmd = (self.root.register(self._verification_code_ok), "%P")
-        code_entry = ttk.Entry(code_frame, font=("Segoe UI", 11), validate="key", validatecommand=code_vcmd)
-        code_entry.pack(fill="x", pady=(4, 6))
-        code_status = ttk.Label(code_frame, text="", style="Sub.TLabel", wraplength=440)
-        code_status.pack(anchor="w")
-
-        verified_email: str | None = None
-        expected_code_hash: bytes | None = None
-        expires_at = 0.0
-
-        def request_code() -> None:
-            nonlocal verified_email, expected_code_hash, expires_at
-            verified_email = None
-            expected_code_hash = None
-            code_entry.delete(0, "end")
-            code_status.configure(text="")
-            try:
-                if not is_gmail_connected():
-                    error.configure(text="Connect a Gmail account before requesting a verification code.")
-                    return
-            except GmailOAuthError as exc:
-                error.configure(text=str(exc))
-                return
-            try:
-                email = normalize_email(email_entry.get())
-                code = new_verification_code()
-                send_verification_code(email, code)
-            except ProfileError as exc:
-                error.configure(text=str(exc))
-                return
-            except Exception:
-                error.configure(text="Could not send the verification email. Check your connection and settings.")
-                return
-            expected_code_hash = hashlib.sha256(code.encode("ascii")).digest()
-            verified_email = email
-            expires_at = time.monotonic() + 600
-            code_status.configure(text="A verification code was sent. It expires in 10 minutes.")
-            error.configure(text="")
-            verify_button.configure(state="normal")
-            code_entry.focus_set()
-
-        send_button = ttk.Button(outer, text="Send verification code", command=request_code)
-        send_button.pack(anchor="w", pady=(0, 8))
-        code_frame.pack(fill="x", pady=(0, 10))
-
-        def verify_code() -> None:
-            nonlocal verified_email, expected_code_hash
-            if not verified_email or expected_code_hash is None:
-                error.configure(text="Send a verification code first.")
-                return
-            if time.monotonic() > expires_at:
-                verified_email = None
-                expected_code_hash = None
-                error.configure(text="The verification code expired. Request a new code.")
-                return
-            try:
-                entered_email = normalize_email(email_entry.get())
-            except ProfileError as exc:
-                error.configure(text=str(exc))
-                return
-            entered_hash = hashlib.sha256(code_entry.get().strip().encode("utf-8")).digest()
-            if not hmac.compare_digest(entered_email, verified_email) or not hmac.compare_digest(entered_hash, expected_code_hash):
-                error.configure(text="Verification code is incorrect.")
-                return
-            error.configure(text="Email verified. You can create your profile.", style="Sub.TLabel")
-            verify_button.configure(state="disabled")
-
-        verify_button = ttk.Button(code_frame, text="Verify code", command=verify_code)
-        verify_button.pack(anchor="e", pady=(6, 0))
-        verify_button.configure(state="disabled")
 
         ttk.Label(outer, text=f"Password ({PASSWORD_MIN_LENGTH}–{PASSWORD_MAX_LENGTH} characters)").pack(anchor="w")
         password_entry = self._password_entry(outer)
@@ -282,13 +134,6 @@ class LoginFlow:
                 email = normalize_email(email_entry.get())
             except ProfileError as exc:
                 error.configure(text=str(exc), style="Error.TLabel")
-                return
-            if verified_email != email or expected_code_hash is None or time.monotonic() > expires_at or code_entry.get().strip() == "":
-                error.configure(text="Verify the code sent to this email before creating your profile.", style="Error.TLabel")
-                return
-            entered_hash = hashlib.sha256(code_entry.get().strip().encode("utf-8")).digest()
-            if not hmac.compare_digest(entered_hash, expected_code_hash):
-                error.configure(text="Verification code is incorrect.", style="Error.TLabel")
                 return
             password = password_entry.get()
             if password != confirm_entry.get():

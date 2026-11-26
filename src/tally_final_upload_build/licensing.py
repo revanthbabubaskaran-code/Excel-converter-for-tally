@@ -23,6 +23,7 @@ REQUEST_PREFIX = "EFT1-"
 TOKEN_PREFIX = "EFT1"
 LICENSE_FILE = "license.json"
 SERVICE_URL_FILE = "license_service_url.json"
+DEFAULT_LICENSE_SERVICE_URL = "https://excel-for-tally-licensing.revtechsolutions-tn.workers.dev"
 
 
 class LicenseError(Exception):
@@ -125,7 +126,7 @@ def license_service_url() -> str | None:
         value = str(data.get("url", "")).strip().rstrip("/")
         return value or None
     except FileNotFoundError:
-        return None
+        return DEFAULT_LICENSE_SERVICE_URL
     except (OSError, json.JSONDecodeError, AttributeError) as exc:
         raise LicenseError("The saved online license service address could not be read.") from exc
 
