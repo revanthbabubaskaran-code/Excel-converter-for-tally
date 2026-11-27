@@ -21,6 +21,7 @@ SALES_HEADERS = [
     "IGSTAmt", "SGSTAmt", "CGSTAmt", "Cess", "Other Amt", "Net_Amt",
     "Narration ", "Discount", "Sales Ledger",
 ]
+SALES_HIDDEN_COLUMNS = ("E", "G", "H", "I", "J", "K", "M", "N", "O", "P", "Q")
 VOUCHER_HEADERS = ["Date", "Rec No", "Bank / Cash", "Credit Account", "Amount", "Cheque No", "Chk Date", "Narration"]
 PAYMENT_HEADERS = ["Date", "Payment No", "Bank / Cash", "Debit Account", "Amount", "Cheque No", "Chk Date", "Narration"]
 JOURNAL_HEADERS = ["VCH Type", "Bill Number", "Bill Date", "Doctor", "Debit Amt", "Item Value", "Narration"]
@@ -201,17 +202,20 @@ def _bank(mode: Any) -> str:
 
 def sales_rows(filename: str, payload: bytes) -> list[list[Any]]:
     headers, source = _rows_from_upload(filename, payload)
+    bill_type_column = _column(headers, "Bill Type")
     _column(headers, "Bill Number")
     _column(headers, "Bill Date")
     _column(headers, "Visit Number")
     _column(headers, "Patient Name")
     _column(headers, "Services / Charge Name")
     _column(headers, "Item Value")
-    _column(headers, "Discount")
 
     indexed_rows: list[tuple[datetime, tuple[tuple[int, Any], ...], int, list[Any]]] = []
     for index, row in enumerate(source):
         if not _has_values(row):
+            continue
+        bill_type = row[bill_type_column] if bill_type_column < len(row) else None
+        if str(bill_type or "").strip().casefold() == "op":
             continue
         bill = _get(row, headers, "Bill Number")
         bill_date = _get(row, headers, "Bill Date")
@@ -223,7 +227,7 @@ def sales_rows(filename: str, payload: bytes) -> list[list[Any]]:
         result = [
             bill, _date_text(bill_date, four_digit_year=True), party, "Auto Sales", None, "Tamil Nadu",
             None, None, None, None, 0, amount, 0, 0, 0, 0, 0, amount,
-            party, _amount(_get(row, headers, "Discount")), _get(row, headers, "Services / Charge Name"),
+            party, 0, _get(row, headers, "Services / Charge Name"),
         ]
         indexed_rows.append((_calendar_date_sort_key(bill_date), _alphanumeric_sort_key(bill), index, result))
     indexed_rows.sort(key=lambda item: item[:3])
@@ -444,6 +448,9 @@ def make_workbook(tables: dict[str, tuple[list[str], Iterable[list[Any]]]]) -> b
             if sheet_name not in book.sheetnames:
                 raise ValueError(f"Output layout is missing the {sheet_name} sheet.")
             sheet = book[sheet_name]
+            if sheet_name == "Auto Sales":
+                for column in SALES_HIDDEN_COLUMNS:
+                    sheet.column_dimensions[column].hidden = True
             for cell in list(sheet._cells.values()):
                 if cell.row > 1:
                     cell.value = None

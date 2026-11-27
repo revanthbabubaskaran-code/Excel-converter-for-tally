@@ -4,7 +4,7 @@ from os.path import dirname
 from pathlib import Path
 from PyInstaller.building.datastruct import Tree
 
-root = Path(SPECPATH).resolve().parent.parent
+root = Path(SPECPATH).resolve().parent
 payload_root = root / 'dist' / 'app' / 'Excel for Tally'
 app_payload = [
     (source, dirname(destination))

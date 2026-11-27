@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-root = Path(SPECPATH).resolve().parent.parent
+root = Path(SPECPATH).resolve().parent
 
 a = Analysis(
     [str(root / 'tools' / 'run_app.py')],
