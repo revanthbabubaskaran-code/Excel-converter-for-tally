@@ -312,17 +312,44 @@ class LoginFlow:
                     f"{exc}\n\nYou can still sign in, but the password will not be saved for autofill.",
                     parent=self.root,
                 )
-            self.show_converter()
+            self.show_profiles()
 
         button = ttk.Button(outer, text="Log in", style="Accent.TButton", command=login)
         button.pack(anchor="e", pady=(16, 0))
         password_entry.bind("<Return>", lambda _event: login())
         (password_entry if remember_default and password_entry.get() else email_entry).focus_set()
 
+    def show_profiles(self) -> None:
+        outer = self._content()
+        self.root.title("Excel for Tally — Choose input type")
+        self.root.geometry("560x480")
+        self.root.minsize(520, 440)
+        ttk.Label(outer, text="Choose input type", font=("Segoe UI", 13, "bold")).pack(
+            anchor="w", pady=(20, 4)
+        )
+        ttk.Label(
+            outer,
+            text="Select the type of reports you want to convert.",
+            style="Sub.TLabel",
+        ).pack(anchor="w", pady=(0, 20))
+
+        profiles = (("Hospital", self.show_converter),)
+        for label, open_profile in profiles:
+            ttk.Button(
+                outer,
+                text=label,
+                style="Accent.TButton",
+                command=open_profile,
+            ).pack(fill="x", pady=(0, 10))
+
     def show_converter(self) -> None:
         self._clear()
         self.root.geometry("820x650")
-        ExcelForTallyApp(self.root, on_logout=self.show_login)
+        ExcelForTallyApp(
+            self.root,
+            on_logout=self.show_login,
+            on_change_profile=self.show_profiles,
+        )
 
 
 def main() -> None:

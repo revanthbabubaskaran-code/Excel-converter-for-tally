@@ -37,9 +37,15 @@ REPORTS = {
 
 
 class ExcelForTallyApp:
-    def __init__(self, root: tk.Tk, on_logout: Callable[[], None] | None = None) -> None:
+    def __init__(
+        self,
+        root: tk.Tk,
+        on_logout: Callable[[], None] | None = None,
+        on_change_profile: Callable[[], None] | None = None,
+    ) -> None:
         self.root = root
         self.on_logout = on_logout
+        self.on_change_profile = on_change_profile
         self.root.title("Excel for Tally")
         self.root.geometry("850x735")
         self.root.minsize(760, 680)
@@ -64,6 +70,10 @@ class ExcelForTallyApp:
         heading = ttk.Frame(outer)
         heading.pack(fill="x")
         ttk.Label(heading, text="Excel for Tally", style="Title.TLabel").pack(side="left", anchor="w")
+        if self.on_change_profile is not None:
+            ttk.Button(heading, text="Choose input type", command=self.on_change_profile).pack(
+                side="right", anchor="e", padx=(8, 0)
+            )
         if self.on_logout is not None:
             ttk.Button(heading, text="Log out", command=self.on_logout).pack(side="right", anchor="e")
         ttk.Label(
