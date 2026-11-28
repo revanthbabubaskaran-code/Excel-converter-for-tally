@@ -114,6 +114,32 @@ def _party(visit_number: Any, patient_name: Any) -> str:
     return f"{visit}-{patient}" if visit and patient else visit or patient
 
 
+def _visit_key(value: Any) -> str:
+    identifier = _identifier(value)
+    return identifier.casefold() if identifier else ""
+
+
+def charge_patient_names_by_visit(filename: str, payload: bytes) -> dict[str, str]:
+    headers, source = _rows_from_upload(filename, payload)
+    visit_column = _column(headers, "Visit Number")
+    patient_column = _column(headers, "Patient Name")
+    names: dict[str, str] = {}
+    for index, row in enumerate(source, start=2):
+        visit = row[visit_column] if visit_column < len(row) else None
+        patient = row[patient_column] if patient_column < len(row) else None
+        key = _visit_key(visit)
+        patient_name = str(patient or "").strip()
+        if not key or not patient_name:
+            continue
+        existing = names.get(key)
+        if existing is not None and existing.casefold() != patient_name.casefold():
+            raise ValueError(
+                f"{filename}: Visit Number {str(visit).strip()!r} has conflicting patient names at row {index}."
+            )
+        names.setdefault(key, patient_name)
+    return names
+
+
 def _datetime(value: Any) -> datetime | None:
     if isinstance(value, datetime):
         return value
@@ -269,23 +295,36 @@ def receipt_rows(filename: str, payload: bytes) -> list[list[Any]]:
     return [row for _, _, _, row in indexed_rows]
 
 
-def refund_rows(filename: str, payload: bytes) -> list[list[Any]]:
+def refund_rows(
+    filename: str,
+    payload: bytes,
+    *,
+    charge_patient_names: dict[str, str],
+) -> list[list[Any]]:
     headers, source = _rows_from_upload(filename, payload)
     indexed_rows: list[tuple[datetime, tuple[tuple[int, Any], ...], int, list[Any]]] = []
     for index, row in enumerate(source):
         if not _has_values(row):
             continue
         payment_date = _get(row, headers, "Payment Date")
-        party = _party(_get(row, headers, "Visit No", "Visit Number"), _get(row, headers, "Patient Name"))
+        visit_number = _get(row, headers, "Visit No", "Visit Number")
+        visit_key = _visit_key(visit_number)
+        charge_patient_name = charge_patient_names.get(visit_key)
+        if not visit_key or not charge_patient_name:
+            raise ValueError(
+                f"{filename}: row {index + 2} has no matching Visit Number in the Charge Item Report."
+            )
+        debit_account = _party(visit_number, charge_patient_name)
+        narration = _party(visit_number, _get(row, headers, "Patient Name"))
         output = [
             _date_text(payment_date, four_digit_year=True),
             _get(row, headers, "Payment Number"),
             _bank(_get(row, headers, "Mode")),
-            party,
+            debit_account,
             _amount(_get(row, headers, "Payment Value")),
             _get(row, headers, "Cheque No."),
             None,
-            party,
+            narration,
         ]
         indexed_rows.append((
             _calendar_date_sort_key(payment_date),

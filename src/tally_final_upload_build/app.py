@@ -14,6 +14,7 @@ from tally_final_upload_build.processor import (
     PAYTM_HEADERS,
     SALES_HEADERS,
     VOUCHER_HEADERS,
+    charge_patient_names_by_visit,
     discount_rows,
     doctor_fee_rows,
     make_workbook,
@@ -149,6 +150,14 @@ class ExcelForTallyApp:
             if first_voucher is None:
                 return
 
+        if "refund" in self.paths and "charge" not in self.paths:
+            messagebox.showerror(
+                "Auto Payment input required",
+                "Auto Payment needs the Charge Item Report to match patient names by Visit Number.",
+                parent=self.root,
+            )
+            return
+
         output_path = filedialog.asksaveasfilename(
             parent=self.root,
             title="Save formatted output workbook",
@@ -219,7 +228,10 @@ class ExcelForTallyApp:
                 row_counts["Doctor Fees"] = len(rows)
             if "refund" in self.paths:
                 name, payload = read("refund")
-                rows = refund_rows(name, payload)
+                if charge_payload is None or charge_filename is None:
+                    raise ValueError("Auto Payment needs the Charge Item Report to match patient names by Visit Number.")
+                patient_names = charge_patient_names_by_visit(charge_filename, charge_payload)
+                rows = refund_rows(name, payload, charge_patient_names=patient_names)
                 tables["Auto Payment"] = (PAYMENT_HEADERS, rows)
                 row_counts["Auto Payment"] = len(rows)
             if "paytm" in self.paths:
