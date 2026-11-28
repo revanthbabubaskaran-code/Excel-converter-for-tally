@@ -23,6 +23,7 @@ from tally_final_upload_build.processor import (
     refund_rows,
     sales_rows,
 )
+from tally_final_upload_build.ui import Appearance, responsive_geometry, scrollable_page
 
 
 REPORTS = {
@@ -42,34 +43,22 @@ class ExcelForTallyApp:
         root: tk.Tk,
         on_logout: Callable[[], None] | None = None,
         on_change_profile: Callable[[], None] | None = None,
+        appearance: Appearance | None = None,
     ) -> None:
         self.root = root
         self.on_logout = on_logout
         self.on_change_profile = on_change_profile
-        self.root.title("Excel for Tally")
-        self.root.geometry("850x735")
-        self.root.minsize(760, 680)
-        self.root.configure(bg="#f3f6f8")
+        self.appearance = appearance or Appearance(root)
+        self.root.title("Tally Input Generator — Hospital")
+        responsive_geometry(self.root, 980, 850)
         self.paths: dict[str, Path] = {}
         self.file_labels: dict[str, ttk.Label] = {}
 
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("TFrame", background="#f3f6f8")
-        style.configure("TLabel", background="#f3f6f8", foreground="#23313a", font=("Segoe UI", 10))
-        style.configure("Title.TLabel", font=("Segoe UI", 22, "bold"), foreground="#123d54")
-        style.configure("Sub.TLabel", font=("Segoe UI", 10), foreground="#52636d")
-        style.configure("Card.TFrame", background="#ffffff", relief="solid", borderwidth=1)
-        style.configure("Card.TLabel", background="#ffffff", foreground="#23313a", font=("Segoe UI", 10))
-        style.configure("Path.TLabel", background="#ffffff", foreground="#53666f", font=("Segoe UI", 9))
-        style.configure("TButton", font=("Segoe UI", 10), padding=(10, 7))
-        style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=(14, 9))
-
-        outer = ttk.Frame(root, padding=(28, 22, 28, 20))
-        outer.pack(fill="both", expand=True)
+        outer = scrollable_page(root, self.appearance.colors["bg"])
+        outer.configure(padding=(24, 20, 24, 20))
+        self.appearance.brand_header(outer)
         heading = ttk.Frame(outer)
         heading.pack(fill="x")
-        ttk.Label(heading, text="Excel for Tally", style="Title.TLabel").pack(side="left", anchor="w")
         if self.on_change_profile is not None:
             ttk.Button(heading, text="Choose input type", command=self.on_change_profile).pack(
                 side="right", anchor="e", padx=(8, 0)
@@ -80,22 +69,24 @@ class ExcelForTallyApp:
             outer,
             text="Choose the hospital Excel reports and create one workbook in the sample format.",
             style="Sub.TLabel",
-            wraplength=780,
+            wraplength=700,
         ).pack(anchor="w", pady=(5, 16))
 
-        ttk.Label(outer, text="Excel reports (select one or more)", font=("Segoe UI", 12, "bold")).pack(
+        ttk.Label(outer, text="Excel reports (select one or more)", font=self.appearance.font(12, "bold")).pack(
             anchor="w", pady=(0, 8)
         )
         reports_card = ttk.Frame(outer, style="Card.TFrame", padding=(14, 6, 14, 8))
         reports_card.pack(fill="x")
         for key, (title, _) in REPORTS.items():
             row = ttk.Frame(reports_card, style="Card.TFrame")
-            row.pack(fill="x", pady=3)
-            ttk.Label(row, text=title, style="Card.TLabel", width=22).pack(side="left", anchor="w")
-            file_label = ttk.Label(row, text="No file selected", style="Path.TLabel", width=48, anchor="w")
-            file_label.pack(side="left", fill="x", expand=True, padx=(8, 10))
+            row.pack(fill="x", pady=5)
+            ttk.Label(row, text=title, style="Card.TLabel").pack(anchor="w", pady=(0, 2))
+            controls = ttk.Frame(row, style="Card.TFrame")
+            controls.pack(fill="x")
+            file_label = ttk.Label(controls, text="No file selected", style="Path.TLabel", anchor="w", wraplength=650)
+            file_label.pack(side="left", fill="x", expand=True, padx=(0, 8))
             self.file_labels[key] = file_label
-            ttk.Button(row, text="Browse…", command=lambda report_key=key: self.choose_file(report_key)).pack(side="right")
+            ttk.Button(controls, text="Browse…", command=lambda report_key=key: self.choose_file(report_key)).pack(side="right")
 
         footer = ttk.Frame(outer)
         footer.pack(fill="x", pady=(12, 0))

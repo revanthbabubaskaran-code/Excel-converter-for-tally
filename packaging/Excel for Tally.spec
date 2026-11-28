@@ -10,6 +10,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(root / 'src' / 'tally_final_upload_build' / 'data' / 'output_layout_template.xlsx'), 'tally_final_upload_build/data'),
+        (str(root / 'src' / 'tally_final_upload_build' / 'data' / 'revtech_logo.png'), 'tally_final_upload_build/data'),
         (str(root / 'src' / 'tally_final_upload_build' / 'license_public_key.txt'), 'tally_final_upload_build'),
     ],
     hiddenimports=[],

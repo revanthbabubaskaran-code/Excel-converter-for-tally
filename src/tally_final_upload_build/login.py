@@ -28,6 +28,7 @@ from tally_final_upload_build.profile import (
     remembered_password,
     set_remembered_login,
 )
+from tally_final_upload_build.ui import Appearance, responsive_geometry, scrollable_page
 
 
 class LoginFlow:
@@ -36,6 +37,7 @@ class LoginFlow:
         self.profile: dict | None = None
         self.password_vcmd = (root.register(self._password_length_ok), "%P")
         self._configure()
+        self.appearance = Appearance(root)
         try:
             self.profile = load_profile()
         except ProfileError as exc:
@@ -66,20 +68,8 @@ class LoginFlow:
         return str(profile_path())
 
     def _configure(self) -> None:
-        self.root.title("Excel for Tally — Sign in")
-        self.root.geometry("520x520")
-        self.root.minsize(480, 440)
-        self.root.configure(bg="#f3f6f8")
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("TFrame", background="#f3f6f8")
-        style.configure("TLabel", background="#f3f6f8", foreground="#23313a", font=("Segoe UI", 10))
-        style.configure("Title.TLabel", font=("Segoe UI", 22, "bold"), foreground="#123d54")
-        style.configure("Sub.TLabel", font=("Segoe UI", 9), foreground="#52636d")
-        style.configure("Error.TLabel", foreground="#c62828", background="#f3f6f8", font=("Segoe UI", 10, "bold"))
-        style.configure("TButton", font=("Segoe UI", 10), padding=(10, 7))
-        style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=(14, 9))
-        style.configure("TEntry", padding=(8, 7), font=("Segoe UI", 11))
+        self.root.title("Tally Input Generator — Rev Tech Solutions")
+        responsive_geometry(self.root, 620, 660)
 
     def _clear(self) -> None:
         for child in self.root.winfo_children():
@@ -87,10 +77,9 @@ class LoginFlow:
 
     def _content(self) -> ttk.Frame:
         self._clear()
-        self.root.geometry("520x520")
-        outer = ttk.Frame(self.root, padding=(36, 28, 36, 30))
-        outer.pack(fill="both", expand=True)
-        ttk.Label(outer, text="Excel for Tally", style="Title.TLabel").pack(anchor="w")
+        outer = scrollable_page(self.root, self.appearance.colors["bg"])
+        outer.configure(padding=(24, 20, 24, 24))
+        self.appearance.brand_header(outer)
         return outer
 
     def _password_entry(self, parent: ttk.Frame) -> ttk.Entry:
@@ -103,9 +92,9 @@ class LoginFlow:
 
     def show_setup(self) -> None:
         outer = self._content()
-        self.root.geometry("560x560")
-        self.root.minsize(520, 500)
-        ttk.Label(outer, text="Create your local profile", font=("Segoe UI", 13, "bold")).pack(anchor="w", pady=(20, 3))
+        self.root.title("Tally Input Generator — Create profile")
+        responsive_geometry(self.root, 620, 680)
+        ttk.Label(outer, text="Create your local profile", font=self.appearance.font(13, "bold")).pack(anchor="w", pady=(20, 3))
         ttk.Label(
             outer,
             text="Create a profile with your email ID and a password. Your profile and password hash are saved on this Windows account.",
@@ -115,7 +104,7 @@ class LoginFlow:
         ).pack(anchor="w", pady=(0, 16))
 
         ttk.Label(outer, text="Login email ID").pack(anchor="w")
-        email_entry = ttk.Entry(outer, font=("Segoe UI", 11))
+        email_entry = ttk.Entry(outer, font=self.appearance.font(11))
         email_entry.pack(fill="x", pady=(4, 12))
 
         ttk.Label(outer, text=f"Password ({PASSWORD_MIN_LENGTH}–{PASSWORD_MAX_LENGTH} characters)").pack(anchor="w")
@@ -153,9 +142,9 @@ class LoginFlow:
 
     def show_license(self) -> None:
         outer = self._content()
-        self.root.geometry("560x600")
-        self.root.minsize(520, 540)
-        ttk.Label(outer, text="License this device", font=("Segoe UI", 13, "bold")).pack(anchor="w", pady=(20, 3))
+        self.root.title("Tally Input Generator — Device license")
+        responsive_geometry(self.root, 620, 700)
+        ttk.Label(outer, text="License this device", font=self.appearance.font(13, "bold")).pack(anchor="w", pady=(20, 3))
         ttk.Label(
             outer,
             text="This copy needs a license for this Windows device. Send the request code below to the software owner to receive a device license.",
@@ -185,7 +174,7 @@ class LoginFlow:
 
         ttk.Button(outer, text="Copy request code", command=copy_request).pack(anchor="e", pady=(0, 14))
         ttk.Label(outer, text="Online license service address").pack(anchor="w")
-        service_entry = ttk.Entry(outer, font=("Segoe UI", 10))
+        service_entry = ttk.Entry(outer, font=self.appearance.font(10))
         service_entry.pack(fill="x", pady=(4, 8))
         try:
             configured_service = license_service_url()
@@ -263,14 +252,15 @@ class LoginFlow:
             self.show_setup()
             return
         outer = self._content()
-        ttk.Label(outer, text="Sign in", font=("Segoe UI", 13, "bold")).pack(anchor="w", pady=(20, 3))
+        self.root.title("Tally Input Generator — Sign in")
+        ttk.Label(outer, text="Sign in", font=self.appearance.font(13, "bold")).pack(anchor="w", pady=(20, 3))
         ttk.Label(
             outer,
             text="Enter the email ID and password saved in your local profile.",
             style="Sub.TLabel",
         ).pack(anchor="w", pady=(0, 18))
 
-        email_entry = ttk.Entry(outer, font=("Segoe UI", 11))
+        email_entry = ttk.Entry(outer, font=self.appearance.font(11))
         password_entry = self._password_entry(outer)
         ttk.Label(outer, text="Login email ID").pack(anchor="w")
         email_entry.pack(fill="x", pady=(4, 13))
@@ -321,10 +311,9 @@ class LoginFlow:
 
     def show_profiles(self) -> None:
         outer = self._content()
-        self.root.title("Excel for Tally — Choose input type")
-        self.root.geometry("560x480")
-        self.root.minsize(520, 440)
-        ttk.Label(outer, text="Choose input type", font=("Segoe UI", 13, "bold")).pack(
+        self.root.title("Tally Input Generator — Choose input type")
+        responsive_geometry(self.root, 620, 540)
+        ttk.Label(outer, text="Choose input type", font=self.appearance.font(13, "bold")).pack(
             anchor="w", pady=(20, 4)
         )
         ttk.Label(
@@ -344,11 +333,12 @@ class LoginFlow:
 
     def show_converter(self) -> None:
         self._clear()
-        self.root.geometry("820x650")
+        self.root.title("Tally Input Generator — Hospital")
         ExcelForTallyApp(
             self.root,
             on_logout=self.show_login,
             on_change_profile=self.show_profiles,
+            appearance=self.appearance,
         )
 
 
